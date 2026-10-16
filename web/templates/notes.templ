@@ -1,0 +1,136 @@
+package templates
+
+import "maidcafe-engine/app/models"
+
+templ sortTabs(base string, current models.Sort, withFollowing bool) {
+	<nav class="tabs" aria-label="sort">
+		for _, s := range []models.Sort{models.SortRecent, models.SortTop, models.SortFollowing} {
+			if s != models.SortFollowing || withFollowing {
+				if s == current {
+					<span class="tab on" aria-current="page">{ string(s) }</span>
+				} else {
+					<a class="tab" href={ templ.URL(sortURL(base, s)) }>{ string(s) }</a>
+				}
+			}
+		}
+	</nav>
+}
+
+templ notePager(pg models.Pager, base string, sort models.Sort) {
+	if sort == models.SortTop {
+		@pagerNav(pg, sortURL(base, sort), "prev", "next")
+	} else {
+		@pagerNav(pg, sortURL(base, sort), "newer", "older")
+	}
+}
+
+templ noteList(p Page, items []models.FeedItem, empty string) {
+	if len(items) == 0 && empty != "" {
+		<p class="muted">{ empty }</p>
+	}
+	for _, it := range items {
+		@noteCard(p, it.Note, it.RepostedBy, "")
+	}
+}
+
+templ tagChips(tags []string) {
+	if len(tags) > 0 {
+		<ul class="tags">
+			for _, t := range tags {
+				<li><a href={ templ.URL(TagURL(t)) } class="tagchip">#{ t }</a></li>
+			}
+		</ul>
+	}
+}
+
+templ tagPicker(tp TagPicker) {
+	if tp.Max > 0 {
+		<div class="picker">
+			if len(tp.Names) == 0 {
+				<span class="hint">no tags yet. <a href="/tags">create one</a>.</span>
+			} else {
+				<span class="picker-label">tags</span>
+				for _, i := range tp.Slots() {
+					<select name={ "tag" + itoa(i+1) } aria-label={ "tag " + itoa(i+1) }>
+						<option value="">--</option>
+						for _, n := range tp.Names {
+							<option value={ n } selected?={ n == tp.At(i) }>#{ n }</option>
+						}
+					</select>
+				}
+			}
+		</div>
+	}
+}
+
+templ noteCard(p Page, n models.Note, repostedBy string, variant string) {
+	<article class={ "box", "note", variant } id={ NoteAnchor(n.ID, repostedBy) }>
+		if repostedBy != "" {
+			<p class="context"><a href={ templ.URL(userURL(repostedBy)) }>~{ repostedBy }</a> reposted</p>
+		}
+		<header class="meta">
+			<a href={ templ.URL(userURL(n.Author)) } class="author">~{ n.Author }</a>
+			if n.ReplyToID != nil {
+				<a href={ templ.URL(NoteURL(*n.ReplyToID)) } class="re">re: ~{ n.ReplyToAuthor }</a>
+			}
+			<a href={ templ.URL(NoteURL(n.ID)) } class="permalink"><time>{ stamp(n.CreatedAt) }</time></a>
+		</header>
+		<div class="body">
+			@markdown(n.Body)
+		</div>
+		@tagChips(n.Tags)
+		@noteActions(p, n, NoteAnchor(n.ID, repostedBy))
+	</article>
+}
+
+templ noteActions(p Page, n models.Note, anchor string) {
+	<footer class="actions">
+		<a href={ templ.URL(NoteURL(n.ID) + "#reply") } class="act">reply <b>{ itoa(n.ReplyCount) }</b></a>
+		@flagButton(p, n.ID, "repost", "reposted", n.Reposted, n.RepostCount, anchor)
+		@flagButton(p, n.ID, "like", "liked", n.Liked, n.LikeCount, anchor)
+	</footer>
+}
+
+templ flagButton(p Page, id int64, verb, done string, on bool, count int, anchor string) {
+	if p.User == nil {
+		<a href="/login" class="act">{ verb } <b>{ itoa(count) }</b></a>
+	} else {
+		<form method="post" action={ templ.URL(NoteURL(id) + "/" + verb) } class="inline">
+			@csrfField(p)
+			<input type="hidden" name="next" value={ p.Path + "#" + anchor }/>
+			<input type="hidden" name="on" value={ onOff(!on) }/>
+			if on {
+				<button type="submit" class="act on" title={ "un" + verb }>{ done } <b>{ itoa(count) }</b></button>
+			} else {
+				<button type="submit" class="act">{ verb } <b>{ itoa(count) }</b></button>
+			}
+		</form>
+	}
+}
+
+templ NotePage(p Page, n *models.Note, parent *models.Note, replies []models.FeedItem, pg models.Pager, draft string) {
+	@Layout(p) {
+		if parent != nil {
+			@noteCard(p, *parent, "", "parent")
+			<div class="thread-link" aria-hidden="true"></div>
+		}
+		@noteCard(p, *n, "", "focus")
+		if p.User != nil {
+			<form method="post" action={ templ.URL(NoteURL(n.ID) + "/reply") } class="box compose" id="reply">
+				@csrfField(p)
+				<label for="reply-body">reply to ~{ n.Author }</label>
+				<textarea id="reply-body" name="body" rows="3" maxlength="300" required>{ draft }</textarea>
+				@formatHint()
+				<div class="row-end"><button type="submit">reply</button></div>
+			</form>
+		} else {
+			<div id="reply">
+				@loginPrompt("reply")
+			</div>
+		}
+		@sectionHead("replies")
+		@pagerNav(pg, NoteURL(n.ID), "prev", "next")
+		@noteList(p, replies, "-- no replies yet. --")
+		@pagerNav(pg, NoteURL(n.ID), "prev", "next")
+	}
+}

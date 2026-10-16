@@ -1,0 +1,115 @@
+package templates
+
+import (
+	"maidcafe-engine/app/models"
+	"maidcafe-engine/web/markup"
+)
+
+templ Layout(p Page) {
+	<!DOCTYPE html>
+	<html lang="en" data-theme={ p.Theme }>
+		<head>
+			<meta charset="utf-8"/>
+			<meta name="viewport" content="width=device-width, initial-scale=1"/>
+			<title>{ p.Title } :: maidcafe</title>
+			<link rel="preload" href="/static/fonts/inter.woff2" as="font" type="font/woff2" crossorigin/>
+			<link rel="stylesheet" href="/static/css/style.css"/>
+		</head>
+		<body>
+			<div class="wrap">
+				<header class="masthead box">
+					<a href="/" class="banner-link"><pre class="banner" aria-label="maidcafe">{ banner }</pre></a>
+					<nav class="nav">
+						<a href="/">[home]</a>
+						<a href="/boards">[boards]</a>
+						<a href="/users">[users]</a>
+						<a href="/tags">[tags]</a>
+						@themeToggle(p)
+						if p.User != nil {
+							if p.Unread > 0 {
+								<a href="/dm" class="unread">[dm { itoa(p.Unread) }]</a>
+							} else {
+								<a href="/dm">[dm]</a>
+							}
+							<a href={ templ.URL(userURL(p.User.Username)) }>[~{ p.User.Username }]</a>
+							<a href="/settings">[settings]</a>
+							<form method="post" action="/logout" class="inline">
+								@csrfField(p)
+								<button type="submit" class="link">[logout]</button>
+							</form>
+						} else {
+							<a href="/login">[login]</a>
+							<a href="/register">[register]</a>
+						}
+					</nav>
+				</header>
+				@searchBar(p)
+				if p.Error != "" {
+					<div class="box alert" role="alert">!! { p.Error }</div>
+				}
+				<main>
+					{ children... }
+				</main>
+				<footer class="footer">
+					<pre>{ footerArt }</pre>
+				</footer>
+			</div>
+		</body>
+	</html>
+}
+
+templ themeToggle(p Page) {
+	<form method="post" action="/theme" class="inline">
+		@csrfField(p)
+		<input type="hidden" name="next" value={ p.Path }/>
+		<button type="submit" name="theme" value={ NextTheme(p.Theme) } class="link" title={ "switch to " + NextTheme(p.Theme) }>[theme: { p.Theme }]</button>
+	</form>
+}
+
+templ pagerNav(pg models.Pager, base, prevLabel, nextLabel string) {
+	if pg.HasPrev() || pg.HasNext {
+		<nav class="pager" aria-label="pagination">
+			if pg.HasPrev() {
+				<a href={ templ.URL(PageURL(base, pg.Page-1)) } rel="prev">&lt;&lt; { prevLabel }</a>
+			} else {
+				<span class="off">&lt;&lt; { prevLabel }</span>
+			}
+			<span class="pager-no">[ page { itoa(pg.Page) } ]</span>
+			if pg.HasNext {
+				<a href={ templ.URL(PageURL(base, pg.Page+1)) } rel="next">{ nextLabel } &gt;&gt;</a>
+			} else {
+				<span class="off">{ nextLabel } &gt;&gt;</span>
+			}
+		</nav>
+	}
+}
+
+templ csrfField(p Page) {
+	<input type="hidden" name="_csrf" value={ p.CSRF }/>
+}
+
+templ sectionHead(title string) {
+	<h2 class="section-head"><span class="rule">==[</span> { title } <span class="rule">]==</span></h2>
+}
+
+templ loginPrompt(action string) {
+	<p class="box muted"><a href="/login">log in</a> or <a href="/register">register</a> to { action }.</p>
+}
+
+templ ErrorPage(p Page, code int, msg string) {
+	@Layout(p) {
+		<section class="box">
+			<h1 class="huge">{ itoa(code) }</h1>
+			<p>{ msg }</p>
+			<p><a href="/">&lt;&lt; back home</a></p>
+		</section>
+	}
+}
+
+templ markdown(src string) {
+	@templ.Raw(markup.Render(src))
+}
+
+templ formatHint() {
+	<p class="hint">**bold** *italic* ~~strike~~ `code` ```block``` [link](url) &gt; quote &gt;&gt;1 [aa]art[/aa]</p>
+}

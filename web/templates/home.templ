@@ -1,0 +1,57 @@
+package templates
+
+import "maidcafe-engine/app/models"
+
+templ Home(p Page, v HomeView) {
+	@Layout(p) {
+		<div class="cols">
+			<section class="col-main">
+				@sectionHead("notes")
+				if !v.Pager.HasPrev() {
+					if p.User != nil {
+						<form method="post" action="/notes" class="box compose">
+							@csrfField(p)
+							<label for="note-body">what's on your mind, ~{ p.User.Username }?</label>
+							<textarea id="note-body" name="body" rows="3" maxlength="300" required>{ v.Draft }</textarea>
+							@formatHint()
+							<div class="row-between">
+								@tagPicker(v.Picker)
+								<button type="submit">post note</button>
+							</div>
+						</form>
+					} else {
+						@loginPrompt("post notes")
+					}
+				}
+				@sortTabs("/", v.Sort, p.User != nil)
+				if v.Sort == models.SortFollowing && p.User == nil {
+					@loginPrompt("see notes from people you follow")
+				} else {
+					if v.Pager.HasPrev() {
+						@notePager(v.Pager, "/", v.Sort)
+					}
+					if v.Sort == models.SortFollowing {
+						@noteList(p, v.Items, "-- nothing from people you follow yet. find some on the users page. --")
+					} else {
+						@noteList(p, v.Items, "-- nothing yet. --")
+					}
+					@notePager(v.Pager, "/", v.Sort)
+				}
+			</section>
+			@sidebar(v.Boards, v.MoreBoards, v.Users, v.Tags)
+		</div>
+	}
+}
+
+templ Profile(p Page, v ProfileView) {
+	@Layout(p) {
+		@profileHeader(p, v.User, v.Card, p.User != nil && p.User.ID == v.User.ID, false)
+		@sectionHead("notes")
+		@sortTabs(userURL(v.User.Username), v.Sort, false)
+		if v.Pager.HasPrev() {
+			@notePager(v.Pager, userURL(v.User.Username), v.Sort)
+		}
+		@noteList(p, v.Items, "-- silence. --")
+		@notePager(v.Pager, userURL(v.User.Username), v.Sort)
+	}
+}

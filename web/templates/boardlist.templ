@@ -1,0 +1,27 @@
+package templates
+
+import "maidcafe-engine/app/models"
+
+templ BoardsPage(p Page, boards []models.Board) {
+	@Layout(p) {
+		<h1 class="huge">boards</h1>
+		<ul class="boards-page">
+			for _, b := range boards {
+				<li class="box">
+					<a href={ templ.URL(boardURL(b.Slug)) } class="board-slug">/{ b.Slug }/</a>
+					<span class="board-name">{ b.Name }</span>
+					<p class="board-desc">{ b.Description }</p>
+					<span class="board-stats">
+						{ plural(b.ThreadCount, "live thread") } :: { itoa(b.Archived) } archived :: { plural(b.PostCount, "post") }
+						if b.LastActivity != nil {
+							:: last activity { stamp(*b.LastActivity) }
+						} else {
+							:: no posts yet
+						}
+						:: <a href={ templ.URL(boardURL(b.Slug) + "/archive") }>[archive]</a>
+					</span>
+				</li>
+			}
+		</ul>
+	}
+}

@@ -1,0 +1,143 @@
+package templates
+
+import "maidcafe-engine/app/models"
+
+templ profileHeader(p Page, u models.User, card models.UserCard, own bool, preview bool) {
+	<section class="box profile">
+		if u.Art != "" {
+			<pre class={ "art", artWidthClass(u.Art) } aria-label={ "text art by ~" + u.Username }>{ u.Art }</pre>
+		}
+		<div class="profile-head">
+			<h1 class="huge">~{ u.Username }</h1>
+			if own {
+				<a href="/settings" class="act">edit profile</a>
+			} else if !preview {
+				<span class="dm-tools">
+					if p.User != nil {
+						<a href={ templ.URL(DMURL(u.Username)) } class="act">message</a>
+					}
+					@followButton(p, card, "")
+				</span>
+			}
+		</div>
+		if u.Bio != "" {
+			<div class="body bio">
+				@markdown(u.Bio)
+			</div>
+		}
+		<p class="stats muted small">
+			<a href={ templ.URL(userURL(u.Username) + "/followers") }>{ plural(card.Followers, "follower") }</a>
+			::
+			<a href={ templ.URL(userURL(u.Username) + "/following") }>{ itoa(card.Following) } following</a>
+			:: member since { stamp(u.CreatedAt) }
+		</p>
+	</section>
+}
+
+templ followButton(p Page, card models.UserCard, anchor string) {
+	if p.User == nil {
+		<a href="/login" class="act">follow</a>
+	} else if p.User.ID != card.ID {
+		<form method="post" action={ templ.URL(userURL(card.Username) + "/follow") } class="inline">
+			@csrfField(p)
+			<input type="hidden" name="next" value={ p.Path + anchor }/>
+			<input type="hidden" name="on" value={ onOff(!card.Followed) }/>
+			if card.Followed {
+				<button type="submit" class="act on" title="unfollow">following</button>
+			} else {
+				<button type="submit" class="act">follow</button>
+			}
+		</form>
+	}
+}
+
+templ userCard(p Page, u models.UserCard) {
+	<article class="box user-card" id={ "u-" + u.Username }>
+		<header class="meta">
+			<a href={ templ.URL(userURL(u.Username)) } class="author">~{ u.Username }</a>
+			<span class="muted">{ plural(u.Followers, "follower") } :: { plural(u.Notes, "note") }</span>
+			<time>joined { stamp(u.CreatedAt) }</time>
+		</header>
+		if u.Bio != "" {
+			<div class="body small">
+				@markdown(u.Bio)
+			</div>
+		}
+		<footer class="actions">
+			@followButton(p, u, "#u-"+u.Username)
+		</footer>
+	</article>
+}
+
+templ userList(p Page, users []models.UserCard, empty string) {
+	if len(users) == 0 {
+		<p class="muted">{ empty }</p>
+	}
+	<div class="user-grid">
+		for _, u := range users {
+			@userCard(p, u)
+		}
+	</div>
+}
+
+templ UsersPage(p Page, v UsersView) {
+	@Layout(p) {
+		<h1 class="huge">users</h1>
+		<nav class="tabs" aria-label="sort">
+			for _, s := range []models.UserSort{models.UserSortNewest, models.UserSortFollowed, models.UserSortName} {
+				if s == v.Sort {
+					<span class="tab on" aria-current="page">{ string(s) }</span>
+				} else if s == models.UserSortNewest {
+					<a class="tab" href="/users">{ string(s) }</a>
+				} else {
+					<a class="tab" href={ templ.URL("/users?sort=" + string(s)) }>{ string(s) }</a>
+				}
+			}
+		</nav>
+		if v.Sort == models.UserSortFollowed && p.User == nil {
+			@loginPrompt("see who you follow")
+		} else if v.Sort == models.UserSortFollowed {
+			@userList(p, v.Users, "-- you aren't following anyone yet. --")
+		} else {
+			@userList(p, v.Users, "-- nobody here. --")
+		}
+		if v.Sort == models.UserSortNewest {
+			@pagerNav(v.Pager, "/users", "prev", "next")
+		} else {
+			@pagerNav(v.Pager, "/users?sort="+string(v.Sort), "prev", "next")
+		}
+	}
+}
+
+templ FollowListPage(p Page, v FollowListView) {
+	@Layout(p) {
+		<p class="crumbs"><a href={ templ.URL(userURL(v.User.Username)) }>&lt;&lt; ~{ v.User.Username }</a></p>
+		<h1 class="huge">{ v.Kind } <span class="thin">of ~{ v.User.Username }</span></h1>
+		@userList(p, v.Users, "-- nobody yet. --")
+		@pagerNav(v.Pager, userURL(v.User.Username)+"/"+v.Kind, "prev", "next")
+	}
+}
+
+templ Settings(p Page, draft models.User, preview bool) {
+	@Layout(p) {
+		if preview {
+			@sectionHead("preview :: not saved yet")
+			@profileHeader(p, draft, models.UserCard{ID: draft.ID, Username: draft.Username}, false, true)
+		}
+		@sectionHead("edit profile")
+		<form method="post" action="/settings" class="box compose settings">
+			@csrfField(p)
+			<label for="bio">bio <span class="muted">(max { itoa(models.MaxBio) } chars, markdown)</span></label>
+			<textarea id="bio" name="bio" rows="4" maxlength={ itoa(models.MaxBio) }>{ draft.Bio }</textarea>
+			@formatHint()
+			<label for="art">text art <span class="muted">(max { itoa(models.MaxArtLines) } lines &times; { itoa(models.MaxArtCols) } columns, shown exactly as typed)</span></label>
+			<textarea id="art" name="art" class="art-input" rows="12" wrap="off" spellcheck="false">{ draft.Art }</textarea>
+			<p class="hint">ascii, box drawing ┌─┐, blocks ▓▒░, braille ⣿ all work. leading spaces are kept.</p>
+			<p class="hint ruler" aria-hidden="true">{ artRuler }</p>
+			<div class="row-end gap">
+				<button type="submit" name="action" value="preview" class="secondary">preview</button>
+				<button type="submit" name="action" value="save">save</button>
+			</div>
+		</form>
+	}
+}

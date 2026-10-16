@@ -1,0 +1,45 @@
+server:
+  listen_addr: ":8080"
+  cookie_secure: false
+
+database:
+  url: "postgres://maidcafe:maidcafe@localhost:5432/maidcafe?sslmode=disable"
+
+pagination:
+  notes: 30
+  replies: 50
+  threads: 10
+  posts: 50
+  archive: 50
+  users: 30
+  tags: 60
+  search: 20
+  messages: 50
+
+tags:
+  max_length: 8
+  max_per_post: 3
+
+sidebar:
+  boards: 2
+  users: 5
+  tags: 12
+
+chat:
+  retention_hours: 24
+
+boards:
+  defaults:
+    bump_limit: 300
+    post_limit: 1000
+    max_threads: 150
+    preview_replies: 5
+
+  overrides:
+    random:
+      bump_limit: 10
+      post_limit: 20
+      max_threads: 6
+      preview_replies: 3
+    meta:
+      max_threads: 30

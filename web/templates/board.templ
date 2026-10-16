@@ -1,0 +1,196 @@
+package templates
+
+import (
+	"maidcafe-engine/app/config"
+	"maidcafe-engine/app/models"
+	"maidcafe-engine/web/markup"
+)
+
+templ BoardPage(p Page, v BoardIndex) {
+	@Layout(p) {
+		<section class="box board-head">
+			<h1 class="huge">/{ v.Board.Slug }/ <span class="thin">{ v.Board.Name }</span></h1>
+			<p class="muted">{ v.Board.Description }</p>
+			<p class="board-rules">
+				bump limit { itoa(v.Rules.BumpLimit) } :: post limit { itoa(v.Rules.PostLimit) } :: { itoa(v.Rules.MaxThreads) } live threads ::
+				<a href={ templ.URL(boardURL(v.Board.Slug) + "/archive") }>[archive]</a>
+			</p>
+		</section>
+		if p.User != nil {
+			<details class="box new-thread" open?={ p.Error != "" }>
+				<summary>[ start a new thread ]</summary>
+				<form method="post" action={ templ.URL(boardURL(v.Board.Slug)) } class="compose">
+					@csrfField(p)
+					<label for="thread-title">title</label>
+					<input id="thread-title" type="text" name="title" maxlength="120" required value={ v.Draft.Title }/>
+					<label for="thread-body">body</label>
+					<textarea id="thread-body" name="body" rows="8" maxlength="4000" required>{ v.Draft.Body }</textarea>
+					@formatHint()
+					<div class="row-between">
+						@tagPicker(v.Picker)
+						<button type="submit">create thread</button>
+					</div>
+				</form>
+			</details>
+		} else {
+			@loginPrompt("start a thread")
+		}
+		if len(v.Threads) == 0 {
+			<p class="muted">-- no threads. start one. --</p>
+		} else {
+			@subjectList(v)
+			for _, tp := range v.Threads {
+				@threadPreview(tp, v)
+			}
+			@pagerNav(v.Pager, boardURL(v.Board.Slug), "newer", "older")
+		}
+	}
+}
+
+templ subjectList(v BoardIndex) {
+	<nav class="box subjects" aria-label="threads on this page">
+		<ol start={ itoa(v.Pager.Offset() + 1) }>
+			for _, tp := range v.Threads {
+				<li>
+					<a href={ templ.URL("#" + threadAnchor(tp.ID)) }>{ tp.Title }</a>
+					<span class="muted">({ itoa(tp.Posts()) })</span>
+				</li>
+			}
+		</ol>
+	</nav>
+}
+
+templ threadPreview(tp models.ThreadPreview, v BoardIndex) {
+	<section class="thread-preview" id={ threadAnchor(tp.ID) }>
+		<h2 class="preview-title">
+			<a href={ templ.URL(threadURL(tp.ID)) }>{ tp.Title }</a>
+			@threadStatus(tp.Thread, v.Rules)
+			@tagChips(tp.Tags)
+		</h2>
+		for i, post := range tp.Shown {
+			@postItem(tp.Thread, post, nil, v.PostsPerPage)
+			if i == 0 && tp.Omitted > 0 {
+				<p class="omitted">
+					{ plural(tp.Omitted, "reply") } omitted.
+					<a href={ templ.URL(threadURL(tp.ID)) }>[view thread]</a>
+				</p>
+			}
+		}
+	</section>
+}
+
+templ threadStatus(t models.Thread, r config.BoardRules) {
+	if t.ArchivedAt != nil {
+		<span class="tag">archived</span>
+	} else if threadFull(t, r) {
+		<span class="tag">full</span>
+	} else if pastBumpLimit(t, r) {
+		<span class="tag" title="replies no longer bump this thread">bump limit</span>
+	}
+}
+
+templ postItem(t models.Thread, post models.Post, backlinks []int, perPage int) {
+	<article class="box post" id={ postAnchor(post.No) }>
+		<header class="meta">
+			<a href={ templ.URL(threadPostURL(t.ID, post.No, perPage)) } class="post-no">#{ itoa(post.No) }</a>
+			<a href={ templ.URL(userURL(post.Author)) } class="author">~{ post.Author }</a>
+			if post.No == 1 {
+				<span class="tag">OP</span>
+			}
+			if post.Sage {
+				<span class="tag sage">sage</span>
+			}
+			<time>{ stamp(post.CreatedAt) }</time>
+			if t.ArchivedAt == nil {
+				<a href={ templ.URL(quoteURL(t, post.No, perPage)) } class="quote-link" title="reply to this post">[&gt;&gt;]</a>
+			}
+		</header>
+		<div class="body">
+			@templ.Raw(markup.RenderPost(post.Body, refResolver(t, perPage)))
+		</div>
+		if len(backlinks) > 0 {
+			<footer class="backlinks">
+				replies:
+				for _, from := range backlinks {
+					<a href={ templ.URL(threadPostURL(t.ID, from, perPage)) } class="ref">&gt;&gt;{ itoa(from) }</a>
+				}
+			</footer>
+		}
+	</article>
+}
+
+templ ThreadPage(p Page, v ThreadView) {
+	@Layout(p) {
+		<p class="crumbs"><a href={ templ.URL(boardURL(v.Thread.BoardSlug)) }>&lt;&lt; /{ v.Thread.BoardSlug }/</a></p>
+		<h1 class="huge thread-heading">{ v.Thread.Title }</h1>
+		<p class="thread-info">
+			{ plural(v.Thread.Posts(), "post") }
+			@threadStatus(*v.Thread, v.Rules)
+			@tagChips(v.Thread.Tags)
+		</p>
+		@pagerNav(v.Pager, threadURL(v.Thread.ID), "prev", "next")
+		for _, post := range v.Posts {
+			@postItem(*v.Thread, post, v.Backlinks[post.No], v.PostsPerPage)
+		}
+		@pagerNav(v.Pager, threadURL(v.Thread.ID), "prev", "next")
+		@sectionHead("reply")
+		<div id="reply">
+			if v.Thread.ArchivedAt != nil {
+				<p class="box notice">this thread is archived. it can be read but not replied to.</p>
+			} else if threadFull(*v.Thread, v.Rules) {
+				<p class="box notice">this thread has reached { itoa(v.Rules.PostLimit) } posts. <a href={ templ.URL(boardURL(v.Thread.BoardSlug)) }>start a new one on /{ v.Thread.BoardSlug }/</a>.</p>
+			}
+			if v.Locked() {
+				if v.Draft != "" {
+					<div class="box compose">
+						<label for="unsent">your post wasn't sent. copy it before you leave:</label>
+						<textarea id="unsent" rows="6" readonly>{ v.Draft }</textarea>
+					</div>
+				}
+			} else if p.User != nil {
+				<form method="post" action={ templ.URL(threadURL(v.Thread.ID)) } class="box compose">
+					@csrfField(p)
+					<label for="reply-body">reply as ~{ p.User.Username }</label>
+					<textarea id="reply-body" name="body" rows="6" maxlength="4000" required>{ v.Draft }</textarea>
+					@formatHint()
+					<div class="row-between">
+						<label class="check">
+							<input type="checkbox" name="sage" value="1" checked?={ v.Sage }/>
+							sage <span class="muted">(don't bump)</span>
+						</label>
+						<button type="submit">post reply</button>
+					</div>
+				</form>
+			} else {
+				@loginPrompt("reply")
+			}
+		</div>
+	}
+}
+
+templ ArchivePage(p Page, v ArchiveView) {
+	@Layout(p) {
+		<p class="crumbs"><a href={ templ.URL(boardURL(v.Board.Slug)) }>&lt;&lt; /{ v.Board.Slug }/</a></p>
+		<h1 class="huge">/{ v.Board.Slug }/ <span class="thin">archive</span></h1>
+		if len(v.Threads) == 0 {
+			<p class="muted">-- nothing archived yet. --</p>
+		} else {
+			<table class="box threads">
+				<thead>
+					<tr><th>title</th><th>by</th><th>posts</th><th>archived</th></tr>
+				</thead>
+				<tbody>
+					for _, t := range v.Threads {
+						<tr>
+							<td><a href={ templ.URL(threadURL(t.ID)) } class="thread-title">{ t.Title }</a></td>
+							<td><a href={ templ.URL(userURL(t.Author)) }>~{ t.Author }</a></td>
+							<td class="num">{ itoa(t.Posts()) }</td>
+							<td><time>{ stamp(*t.ArchivedAt) }</time></td>
+						</tr>
+					}
+				</tbody>
+			</table>
+			@pagerNav(v.Pager, boardURL(v.Board.Slug)+"/archive", "newer", "older")
+		}
+	}
+}

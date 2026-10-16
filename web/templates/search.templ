@@ -1,0 +1,82 @@
+package templates
+
+import "maidcafe-engine/app/models"
+
+templ SearchPage(p Page, v SearchView) {
+	@Layout(p) {
+		@searchBody(p, v)
+	}
+}
+
+templ searchBody(p Page, v SearchView) {
+	<div class="search-results">
+		if v.Query == "" {
+			<h1 class="huge">search</h1>
+			<p class="muted">type something in the bar above. <code>#tag</code> jumps to a tag, <code>~user</code> to a profile. quotes for exact phrases, <code>-word</code> to exclude.</p>
+		} else {
+			<h1 class="huge">results <span class="thin">:: <q>{ v.Query }</q></span></h1>
+			<nav class="tabs" aria-label="scope">
+				for _, s := range []string{"all", "notes", "threads", "users", "tags"} {
+					if s == v.Scope {
+						<span class="tab on" aria-current="page">{ s }</span>
+					} else {
+						<a class="tab" href={ templ.URL(searchURL(v.Query, s)) }>{ s }</a>
+					}
+				}
+			</nav>
+			if v.Empty() {
+				<p class="muted">-- nothing found. --</p>
+			}
+			if len(v.Notes) > 0 {
+				@sectionHead("notes")
+				@noteList(p, v.Notes, "")
+				@moreLink(v, "notes", len(v.Notes))
+			}
+			if len(v.Threads) > 0 {
+				@sectionHead("threads")
+				@threadTable(v.Threads)
+				@moreLink(v, "threads", len(v.Threads))
+			}
+			if len(v.Posts) > 0 {
+				@sectionHead("posts")
+				for _, sp := range v.Posts {
+					<article class="box post">
+						<header class="meta">
+							<a href={ templ.URL(PostURL(sp.ThreadID, models.PageOf(sp.No, v.PostsPerPage), sp.No)) } class="post-no">#{ itoa(sp.No) }</a>
+							<a href={ templ.URL(userURL(sp.Author)) } class="author">~{ sp.Author }</a>
+							<span class="muted">in <a href={ templ.URL(threadURL(sp.ThreadID)) }>{ sp.ThreadTitle }</a> on <a href={ templ.URL(boardURL(sp.BoardSlug)) }>/{ sp.BoardSlug }/</a></span>
+							<time>{ stamp(sp.CreatedAt) }</time>
+						</header>
+						<div class="body">
+							@markdown(sp.Body)
+						</div>
+					</article>
+				}
+				@moreLink(v, "threads", len(v.Posts))
+			}
+			if len(v.Users) > 0 {
+				@sectionHead("users")
+				@userList(p, v.Users, "")
+				@moreLink(v, "users", len(v.Users))
+			}
+			if len(v.Tags) > 0 {
+				@sectionHead("tags")
+				<ul class="tag-cloud">
+					for _, t := range v.Tags {
+						<li><a href={ templ.URL(TagURL(t.Name)) } class="tagchip">#{ t.Name } <span class="muted">{ itoa(t.Uses()) }</span></a></li>
+					}
+				</ul>
+				@moreLink(v, "tags", len(v.Tags))
+			}
+			if v.Scope != "all" {
+				@pagerNav(v.Pager, searchURL(v.Query, v.Scope), "prev", "next")
+			}
+		}
+	</div>
+}
+
+templ moreLink(v SearchView, scope string, n int) {
+	if v.Scope == "all" && n >= v.Each {
+		<p class="more"><a href={ templ.URL(searchURL(v.Query, scope)) }>[more { scope }]</a></p>
+	}
+}

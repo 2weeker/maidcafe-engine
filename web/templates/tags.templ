@@ -1,0 +1,121 @@
+package templates
+
+import "maidcafe-engine/app/models"
+
+templ TagsPage(p Page, v TagsView) {
+	@Layout(p) {
+		<h1 class="huge">tags</h1>
+		if p.User != nil {
+			<form method="post" action="/tags" class="box compose tag-create">
+				@csrfField(p)
+				<label for="tag-name">new tag <span class="muted">(1-{ itoa(v.MaxLen) } chars: a-z 0-9 - _)</span></label>
+				<div class="row-between">
+					<span class="tag-input"><span class="hash">#</span><input id="tag-name" type="text" name="name" maxlength={ itoa(v.MaxLen) } pattern="[A-Za-z0-9_-]+" value={ v.Draft } required autocomplete="off"/></span>
+					<button type="submit">create tag</button>
+				</div>
+			</form>
+		} else {
+			@loginPrompt("create tags")
+		}
+		<nav class="tabs" aria-label="sort">
+			for _, s := range []models.TagSort{models.TagSortPopular, models.TagSortNewest, models.TagSortName} {
+				if s == v.Sort {
+					<span class="tab on" aria-current="page">{ string(s) }</span>
+				} else if s == models.TagSortPopular {
+					<a class="tab" href="/tags">{ string(s) }</a>
+				} else {
+					<a class="tab" href={ templ.URL("/tags?sort=" + string(s)) }>{ string(s) }</a>
+				}
+			}
+		</nav>
+		if len(v.Tags) == 0 {
+			<p class="muted">-- no tags yet. make the first one. --</p>
+		} else {
+			<table class="box threads tag-table">
+				<thead>
+					<tr><th>tag</th><th>notes</th><th>threads</th><th>by</th><th>created</th></tr>
+				</thead>
+				<tbody>
+					for _, t := range v.Tags {
+						<tr>
+							<td><a href={ templ.URL(TagURL(t.Name)) } class="tagchip">#{ t.Name }</a></td>
+							<td class="num">{ itoa(t.NoteCount) }</td>
+							<td class="num">{ itoa(t.ThreadCount) }</td>
+							<td>
+								if t.CreatedBy != "" {
+									<a href={ templ.URL(userURL(t.CreatedBy)) }>~{ t.CreatedBy }</a>
+								} else {
+									<span class="muted">--</span>
+								}
+							</td>
+							<td><time>{ stamp(t.CreatedAt) }</time></td>
+						</tr>
+					}
+				</tbody>
+			</table>
+		}
+		if v.Sort == models.TagSortPopular {
+			@pagerNav(v.Pager, "/tags", "prev", "next")
+		} else {
+			@pagerNav(v.Pager, "/tags?sort="+string(v.Sort), "prev", "next")
+		}
+	}
+}
+
+templ TagPage(p Page, v TagView) {
+	@Layout(p) {
+		<p class="crumbs"><a href="/tags">&lt;&lt; tags</a></p>
+		<h1 class="huge">#{ v.Tag.Name }</h1>
+		<p class="thread-info">
+			{ plural(v.Tag.NoteCount, "note") } :: { plural(v.Tag.ThreadCount, "thread") }
+			if v.Tag.CreatedBy != "" {
+				:: made by <a href={ templ.URL(userURL(v.Tag.CreatedBy)) }>~{ v.Tag.CreatedBy }</a>
+			}
+		</p>
+		<nav class="tabs" aria-label="show">
+			if v.Show == "notes" {
+				<span class="tab on" aria-current="page">notes</span>
+				<a class="tab" href={ templ.URL(TagURL(v.Tag.Name) + "?show=threads") }>threads</a>
+			} else {
+				<a class="tab" href={ templ.URL(TagURL(v.Tag.Name)) }>notes</a>
+				<span class="tab on" aria-current="page">threads</span>
+			}
+		</nav>
+		if v.Show == "threads" {
+			if len(v.Threads) == 0 {
+				<p class="muted">-- no threads with this tag. --</p>
+			} else {
+				@threadTable(v.Threads)
+			}
+			@pagerNav(v.Pager, TagURL(v.Tag.Name)+"?show=threads", "prev", "next")
+		} else {
+			@sortTabs(TagURL(v.Tag.Name), v.Sort, false)
+			@noteList(p, v.Notes, "-- no notes with this tag. --")
+			@notePager(v.Pager, TagURL(v.Tag.Name), v.Sort)
+		}
+	}
+}
+
+templ threadTable(threads []models.Thread) {
+	<table class="box threads">
+		<thead>
+			<tr><th>title</th><th>board</th><th>by</th><th>posts</th><th>bumped</th></tr>
+		</thead>
+		<tbody>
+			for _, t := range threads {
+				<tr>
+					<td>
+						<a href={ templ.URL(threadURL(t.ID)) } class="thread-title">{ t.Title }</a>
+						if t.ArchivedAt != nil {
+							<span class="tag">archived</span>
+						}
+					</td>
+					<td><a href={ templ.URL(boardURL(t.BoardSlug)) }>/{ t.BoardSlug }/</a></td>
+					<td><a href={ templ.URL(userURL(t.Author)) }>~{ t.Author }</a></td>
+					<td class="num">{ itoa(t.Posts()) }</td>
+					<td><time>{ stamp(t.BumpedAt) }</time></td>
+				</tr>
+			}
+		</tbody>
+	</table>
+}
