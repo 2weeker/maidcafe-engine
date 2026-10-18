@@ -1,0 +1,60 @@
+package templates
+
+import "maidcafe-engine/app/models"
+
+type ConfirmView struct {
+	Title  string
+	Text   string
+	Action string
+	Button string
+	Cancel string
+}
+
+templ Confirm(p Page, v ConfirmView) {
+	@Layout(p) {
+		<form method="post" action={ templ.URL(v.Action) } class="box danger confirm">
+			@csrfField(p)
+			<h1 class="huge">{ v.Title }</h1>
+			<p>{ v.Text }</p>
+			<div class="row-end gap">
+				<a href={ templ.URL(v.Cancel) } class="act">cancel</a>
+				<button type="submit" class="danger-btn">{ v.Button }</button>
+			</div>
+		</form>
+	}
+}
+
+templ EditPost(p Page, t models.Thread, post models.Post, body string) {
+	@Layout(p) {
+		<p class="crumbs"><a href={ templ.URL(threadURL(t.ID)) }>&lt;&lt; { t.Title }</a></p>
+		<form method="post" action={ templ.URL(postEditURL(t.ID, post.No)) } class="box compose">
+			@csrfField(p)
+			<h1 class="huge">edit #{ itoa(post.No) }</h1>
+			if post.Author != p.User.Username {
+				<p class="muted small">editing ~{ post.Author }'s post as a moderator. this is logged.</p>
+			}
+			<textarea name="body" rows="10" maxlength="4000" required>{ body }</textarea>
+			@formatHint()
+			<div class="row-end gap">
+				<a href={ templ.URL(threadURL(t.ID)) } class="act">cancel</a>
+				<button type="submit">save</button>
+			</div>
+		</form>
+	}
+}
+
+templ EditNote(p Page, id int64, body string) {
+	@Layout(p) {
+		<p class="crumbs"><a href={ templ.URL(NoteURL(id)) }>&lt;&lt; note</a></p>
+		<form method="post" action={ templ.URL(NoteURL(id) + "/edit") } class="box compose">
+			@csrfField(p)
+			<h1 class="huge">edit note</h1>
+			<textarea name="body" rows="4" maxlength="300" required>{ body }</textarea>
+			@formatHint()
+			<div class="row-end gap">
+				<a href={ templ.URL(NoteURL(id)) } class="act">cancel</a>
+				<button type="submit">save</button>
+			</div>
+		</form>
+	}
+}

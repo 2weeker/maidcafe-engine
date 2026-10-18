@@ -9,7 +9,6 @@ import (
 const (
 	SessionCookie = "mc_session"
 	userKey       = "user"
-	unreadKey     = "unread_dms"
 )
 
 func LoadUser(store *models.Store) fiber.Handler {
@@ -17,13 +16,17 @@ func LoadUser(store *models.Store) fiber.Handler {
 		if token := c.Cookies(SessionCookie); token != "" {
 			if u, err := store.UserBySession(c.Context(), token); err == nil {
 				c.Locals(userKey, u)
-				if n, err := store.UnreadMessages(c.Context(), u.ID); err == nil {
-					c.Locals(unreadKey, n)
-				}
 			}
 		}
 		return c.Next()
 	}
+}
+
+func RequireGuest(c fiber.Ctx) error {
+	if u := CurrentUser(c); u != nil {
+		return c.Redirect().To("/u/" + u.Username)
+	}
+	return c.Next()
 }
 
 func RequireUser(c fiber.Ctx) error {
@@ -33,9 +36,41 @@ func RequireUser(c fiber.Ctx) error {
 	return c.Next()
 }
 
-func UnreadDMs(c fiber.Ctx) int {
-	n, _ := c.Locals(unreadKey).(int)
-	return n
+func RequirePoster(c fiber.Ctx) error {
+	u := CurrentUser(c)
+	if u == nil {
+		return c.Redirect().To("/login")
+	}
+	if u.Banned() {
+		msg := "your account is banned"
+		if u.BanReason != "" {
+			msg += ": " + u.BanReason
+		}
+		return fiber.NewError(fiber.StatusForbidden, msg)
+	}
+	return c.Next()
+}
+
+func RequireMod(c fiber.Ctx) error {
+	u := CurrentUser(c)
+	if u == nil {
+		return c.Redirect().To("/login")
+	}
+	if !u.IsMod() {
+		return fiber.NewError(fiber.StatusForbidden, "moderators only")
+	}
+	return c.Next()
+}
+
+func RequireAdmin(c fiber.Ctx) error {
+	u := CurrentUser(c)
+	if u == nil {
+		return c.Redirect().To("/login")
+	}
+	if !u.IsAdmin() {
+		return fiber.NewError(fiber.StatusForbidden, "admins only")
+	}
+	return c.Next()
 }
 
 func CurrentUser(c fiber.Ctx) *models.User {

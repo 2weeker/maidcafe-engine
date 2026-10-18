@@ -25,6 +25,8 @@ type Note struct {
 	Liked         bool
 	Reposted      bool
 	Tags          []string
+	EditedAt      *time.Time
+	AuthorID      int64
 }
 
 type FeedItem struct {
@@ -52,7 +54,8 @@ const noteCols = `n.id, u.username, n.body, n.created_at, n.reply_to_id, coalesc
 	n.like_count, n.repost_count, n.reply_count,
 	EXISTS (SELECT 1 FROM note_likes   l WHERE l.note_id = n.id AND l.user_id = $1),
 	EXISTS (SELECT 1 FROM note_reposts r WHERE r.note_id = n.id AND r.user_id = $1),
-	coalesce((SELECT array_agg(t.name ORDER BY t.name) FROM note_tags nt JOIN tags t ON t.id = nt.tag_id WHERE nt.note_id = n.id), '{}'::text[])`
+	coalesce((SELECT array_agg(t.name ORDER BY t.name) FROM note_tags nt JOIN tags t ON t.id = nt.tag_id WHERE nt.note_id = n.id), '{}'::text[]),
+	n.edited_at, n.user_id`
 
 const noteJoins = `JOIN users u ON u.id = n.user_id
 	LEFT JOIN notes p ON p.id = n.reply_to_id
@@ -133,7 +136,7 @@ func (s *Store) queryFeed(ctx context.Context, sql string, args ...any) ([]FeedI
 	return pgx.CollectRows(rows, func(r pgx.CollectableRow) (FeedItem, error) {
 		var f FeedItem
 		err := r.Scan(&f.RepostedBy, &f.ID, &f.Author, &f.Body, &f.CreatedAt, &f.ReplyToID, &f.ReplyToAuthor,
-			&f.LikeCount, &f.RepostCount, &f.ReplyCount, &f.Liked, &f.Reposted, &f.Tags)
+			&f.LikeCount, &f.RepostCount, &f.ReplyCount, &f.Liked, &f.Reposted, &f.Tags, &f.EditedAt, &f.AuthorID)
 		return f, err
 	})
 }

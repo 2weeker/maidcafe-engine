@@ -5,7 +5,7 @@ User text (notes, board posts, bios) is stored exactly as typed and formatted on
 Every text box shows a one-line reminder:
 
 ```
-**bold** *italic* ~~strike~~ `code` ```block``` [link](url) > quote >>1 [aa]art[/aa]
+**bold** *italic* ~~strike~~ `code` ```block``` [link](url) > quote >text [spoiler]hidden[/spoiler] >>1 [aa]art[/aa]
 ```
 
 ## Supported
@@ -21,6 +21,8 @@ Every text box shows a one-line reminder:
 | `https://…` | an automatic link |
 | `- item` / `1. item` | lists |
 | `> text` | a quote |
+| `>text` | greentext: the whole line in green |
+| `[spoiler]text[/spoiler]` | a spoiler: ink on ink until hovered or focused |
 | a newline | a line break (every newline is kept) |
 
 Leading spaces at the start of a line collapse, as in any markdown. For little doodles that need
@@ -41,13 +43,37 @@ their alignment, use a code fence or `[aa]`. A `*` is read as emphasis, so kaomo
 
 These differ slightly from standard markdown, on purpose:
 
-- **Only `> ` with a space, or a bare `>` line, makes a quote.** `>text` without a space stays
-  literal, so 4chan-style greentext lines render as plain text.
+- **Only `> ` with a space, or a bare `>` line, makes a quote.** `>text` without a space is
+  greentext (below).
 - `> > text` nests a quote.
 - **A plain line right after a quote starts a new paragraph.** In standard markdown,
   `> they said` followed by `my reply` would pull your reply into the quote ("lazy
   continuation"); here it doesn't.
 - None of this applies inside code blocks.
+
+## Greentext
+
+A line that starts with `>` directly followed by text (`>be me`) is rendered in green, the
+whole line, in the same paragraph as the lines around it. Markdown still works inside it, so
+`>be **me**` is green with bold. Lines starting with `>>` are never green: `>>12` and
+`>>>/board/` are references, and anything else beginning with `>>` stays plain. `>` with a
+space is a quote, a bare `>` continues a quote, and nothing is green inside code or `[aa]`.
+
+The color is the one place the themes use a hue: `--green` is defined per theme in
+`style.css`.
+
+## Spoilers
+
+Wrap text in `[spoiler]` … `[/spoiler]`. It renders as a `<span class="spoiler" tabindex="0">`
+drawn ink-on-ink, and the text shows while the span is hovered or focused: mouse over it, tab to
+it, or tap it on a touch screen. Pure CSS, no JavaScript.
+
+- Markdown works inside: `[spoiler]the **butler**[/spoiler]`.
+- A spoiler can span lines within one paragraph, but not a blank line.
+- The tags are case-insensitive. An unclosed `[spoiler]` or a stray `[/spoiler]` is shown as
+  typed, and the tags are ignored inside `` `code` ``, code fences and `[aa]`.
+- Emphasis can't straddle a spoiler boundary: `[spoiler]*a[/spoiler] b*` leaves the asterisks
+  literal.
 
 ## Board-only: `>>N`
 
@@ -85,5 +111,7 @@ Profile text art is different: it's monospace and has its own field ([profiles.m
 
 - HTML is escaped; raw HTML parsing is turned off.
 - Links get `rel="nofollow ugc noopener noreferrer"`; internal `>>` links get `class="ref"`.
+- Greentext and spoilers are real syntax-tree nodes (`web/markup/extras.go`), not string
+  replacement, so they can't be used to inject markup.
 - Rendering happens on every view. Stored text is never altered except for trimming outer
   whitespace and normalizing line endings.

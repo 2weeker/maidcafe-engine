@@ -2,10 +2,8 @@
 
 ## Principles
 
-- **No JavaScript, with one exception.** Every interaction is a link or an HTML form. Toggles
-  (likes, reposts, theme) are tiny POST forms that redirect back to where you were. The one
-  exception is the real-time DM chat (`web/static/js/chat.js`), which enhances a page that still
-  works as a plain form without it.
+- **No JavaScript.** Every interaction is a link or an HTML form. Toggles (likes, reposts, theme)
+  are tiny POST forms that redirect back to where you were.
 - **Server-rendered.** templ compiles views to Go; Fiber serves them. One binary with the CSS and
   fonts embedded.
 - **Minimal dependencies.** Fiber, templ, pgx, bcrypt, goldmark, a YAML parser. No ORM, no
@@ -23,8 +21,9 @@ app/
     migrations/*.sql       schema, applied in filename order, embedded in the binary
   models/                  M: all SQL lives here (Store methods), validation, domain types
   controllers/             C: one handler per route, error page, page/pager helpers
-  middleware/              session lookup (LoadUser), RequireUser guard
-  realtime/                in-process pub/sub hub for live DM streams
+  middleware/              session lookup (LoadUser), role guards, request rate limit
+  captcha/                 captcha store (issue, verify, expire); captchaimg/ draws the PNG
+  limits/                  token-bucket rate limits, failure lockouts, address keys
   routes/                  the URL table
 web/
   templates/               V: *.templ views + small Go helpers (URLs, view structs)
@@ -92,11 +91,13 @@ for the theme button, optional error), which `controllers.page()` fills.
 | Links | User links get `rel="nofollow ugc noopener noreferrer"` |
 | Open redirects | The `next` field used by the theme and like/repost forms must be a local path (`/…`, not `//…` or `/\…`); anything else redirects to `/` |
 | Request size | Bodies are capped at 64 KB |
+| Bots on auth forms | Image captcha and an off-screen honeypot field on login and registration, with a per-address lockout after repeated wrong answers. See [captcha-and-rate-limits.md](features/captcha-and-rate-limits.md) |
+| Flooding | Token-bucket limits on every request (per address for guests, per account for users), on login/register attempts, and on new accounts per address; `429` with `Retry-After` |
+| Password guessing | Login attempts per address are capped by `rate_limits.auth_attempts`, on top of the captcha |
 | Cookies over HTTPS | Set `server.cookie_secure: true` (or `COOKIE_SECURE=true`) |
 
-**Not yet:** rate limiting, account lockout, moderation tools, CSRF storage shared across
-multiple app instances (tokens live in memory, which is fine for one instance). See
-[roadmap.md](roadmap.md).
+**Not yet:** CSRF tokens, captchas and rate-limit counters live in one process's memory, which is
+fine for a single instance but not shared across several. See [roadmap.md](roadmap.md).
 
 ## Configuration flow
 
@@ -112,5 +113,4 @@ free of config types.
   Stage two is `alpine:3.22` with an unprivileged `maidcafe` user.
 - **Compose:** `db` (postgres:18-alpine with a health check and a named volume) and `app`
   (depends on a healthy db, mounts `config.yaml`, exposes `APP_PORT`).
-- **Shutdown:** SIGINT/SIGTERM close the realtime hub (ending open DM streams), then trigger
-  Fiber's graceful shutdown with a 10-second limit.
+- **Shutdown:** SIGINT/SIGTERM trigger Fiber's graceful shutdown with a 10-second limit.

@@ -13,10 +13,18 @@ templ profileHeader(p Page, u models.User, card models.UserCard, own bool, previ
 				<a href="/settings" class="act">edit profile</a>
 			} else if !preview {
 				<span class="dm-tools">
-					if p.User != nil {
-						<a href={ templ.URL(DMURL(u.Username)) } class="act">message</a>
-					}
 					@followButton(p, card, "")
+					if p.User.IsMod() && u.Role != models.RoleAdmin && (u.Role != models.RoleMod || p.User.IsAdmin()) {
+						if u.BannedAt != nil {
+							<form method="post" action={ templ.URL(userURL(u.Username) + "/unban") } class="inline">
+								@csrfField(p)
+								<input type="hidden" name="next" value={ userURL(u.Username) }/>
+								<button type="submit" class="act on" title="lift the ban">banned</button>
+							</form>
+						} else {
+							<a href={ templ.URL("/admin/users?q=" + u.Username) } class="act">moderate</a>
+						}
+					}
 				</span>
 			}
 		</div>
@@ -24,6 +32,9 @@ templ profileHeader(p Page, u models.User, card models.UserCard, own bool, previ
 			<div class="body bio">
 				@markdown(u.Bio)
 			</div>
+		}
+		if u.Role != models.RoleUser {
+			<p class="role-line"><span class="tag">{ u.Role }</span></p>
 		}
 		<p class="stats muted small">
 			<a href={ templ.URL(userURL(u.Username) + "/followers") }>{ plural(card.Followers, "follower") }</a>
@@ -139,5 +150,28 @@ templ Settings(p Page, draft models.User, preview bool) {
 				<button type="submit" name="action" value="save">save</button>
 			</div>
 		</form>
+		@sectionHead("delete account")
+		if draft.DeleteAt != nil {
+			<section class="box danger">
+				<p>your account is scheduled for deletion on <b>{ stamp(*draft.DeleteAt) } UTC</b>. until then everything stays as it is and you can change your mind.</p>
+				<form method="post" action="/settings/undelete" class="row-end">
+					@csrfField(p)
+					<input type="hidden" name="next" value="/settings"/>
+					<button type="submit">keep my account</button>
+				</form>
+			</section>
+		} else {
+			<form method="post" action="/settings/delete" class="box compose danger">
+				@csrfField(p)
+				<p>
+					this removes your account, your notes and replies, your likes, reposts and follows.
+					your board posts stay in their threads as <b>~deleted</b> with the text <b>[deleted]</b>, so other people's threads keep working.
+				</p>
+				<p>nothing happens right away: you get <b>{ plural(p.GraceHours, "hour") }</b> to cancel from this page or the banner on every page. after that it's gone for good and the username is free again.</p>
+				<label for="delete-password">type your password to confirm</label>
+				<input id="delete-password" type="password" name="password" autocomplete="current-password" required/>
+				<div class="row-end"><button type="submit" class="danger-btn">schedule deletion</button></div>
+			</form>
+		}
 	}
 }

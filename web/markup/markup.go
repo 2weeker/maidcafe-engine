@@ -12,6 +12,7 @@ import (
 	"github.com/yuin/goldmark/ast"
 	"github.com/yuin/goldmark/extension"
 	"github.com/yuin/goldmark/parser"
+	"github.com/yuin/goldmark/renderer"
 	"github.com/yuin/goldmark/renderer/html"
 	"github.com/yuin/goldmark/text"
 	"github.com/yuin/goldmark/util"
@@ -27,14 +28,14 @@ var md = goldmark.New(
 			parser.NewCodeBlockParser(),
 			parser.NewHTMLBlockParser(),
 		)...),
-		parser.WithInlineParsers(without(parser.DefaultInlineParsers(),
+		parser.WithInlineParsers(append(without(parser.DefaultInlineParsers(),
 			parser.NewRawHTMLParser(),
-		)...),
+		), util.Prioritized(spoilerParser{}, 150))...),
 		parser.WithParagraphTransformers(parser.DefaultParagraphTransformers()...),
 		parser.WithASTTransformers(util.Prioritized(postProcess{}, 100)),
 	)),
 	goldmark.WithExtensions(extension.Strikethrough, extension.Linkify),
-	goldmark.WithRendererOptions(html.WithHardWraps()),
+	goldmark.WithRendererOptions(html.WithHardWraps(), renderer.WithNodeRenderers(util.Prioritized(extraRenderer{}, 100))),
 )
 
 type RefResolver func(no int) (url string, ok bool)
@@ -128,7 +129,7 @@ func longestRun(s string, c byte) int {
 }
 
 func normalize(src string, posts bool) string {
-	lines := strings.Split(expandAA(src), "\n")
+	lines := strings.Split(expandAA(strings.ReplaceAll(src, greenMark, "")), "\n")
 	out := make([]string, 0, len(lines))
 	var fence string
 	prevQuote := false
@@ -157,7 +158,11 @@ func normalize(src string, posts bool) string {
 		line = linkRefs(line, posts)
 		trimmed = strings.TrimLeft(line, " ")
 		if indent < 4 && strings.HasPrefix(trimmed, ">") && !isQuote {
-			line = strings.Repeat(" ", indent) + `\` + trimmed
+			mark := ""
+			if !strings.HasPrefix(trimmed, ">>") {
+				mark = greenMark
+			}
+			line = strings.Repeat(" ", indent) + mark + `\` + trimmed
 		}
 		if prevQuote && !isQuote && strings.TrimSpace(line) != "" {
 			out = append(out, "")
@@ -181,6 +186,7 @@ func fenceOpener(s string) string {
 type postProcess struct{}
 
 func (postProcess) Transform(doc *ast.Document, reader text.Reader, pc parser.Context) {
+	wrapGreentext(doc, reader.Source())
 	resolve, _ := pc.Get(resolverKey).(RefResolver)
 	var images []*ast.Image
 	var dead []*ast.Link

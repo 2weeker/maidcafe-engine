@@ -19,19 +19,18 @@ import (
 	"maidcafe-engine/app/database"
 	"maidcafe-engine/app/middleware"
 	"maidcafe-engine/app/models"
-	"maidcafe-engine/app/realtime"
 	"maidcafe-engine/app/routes"
 	"maidcafe-engine/web"
 )
 
-func purgeChat(ctx context.Context, store *models.Store, keep time.Duration) {
+func purgeAccounts(ctx context.Context, store *models.Store) {
 	tick := time.NewTicker(time.Minute)
 	defer tick.Stop()
 	for {
-		if n, err := store.PurgeMessages(ctx, keep); err != nil {
-			log.Printf("chat purge: %v", err)
-		} else if n > 0 {
-			log.Printf("chat purge: removed %d messages older than %s", n, keep)
+		if names, err := store.PurgeDeletedAccounts(ctx); err != nil {
+			log.Printf("account purge: %v", err)
+		} else if len(names) > 0 {
+			log.Printf("account purge: deleted %v", names)
 		}
 		select {
 		case <-ctx.Done():
@@ -61,16 +60,32 @@ func main() {
 	}
 
 	store := models.NewStore(pool)
+	if err := store.SyncAdmins(ctx, cfg.Admin.Usernames); err != nil {
+		log.Fatalf("admins: %v", err)
+	}
+	log.Printf("admins: %v", cfg.Admin.Usernames)
 
-	app := fiber.New(fiber.Config{
+	fcfg := fiber.Config{
 		AppName:      "maidcafe",
 		ErrorHandler: controllers.ErrorHandler,
 		BodyLimit:    64 * 1024,
-	})
+	}
+	if h := cfg.Server.ProxyHeader; h != "" {
+		fcfg.ProxyHeader = h
+		fcfg.TrustProxy = true
+		fcfg.TrustProxyConfig = fiber.TrustProxyConfig{Proxies: cfg.Server.TrustedProxies}
+		if len(cfg.Server.TrustedProxies) == 0 {
+			fcfg.TrustProxyConfig = fiber.TrustProxyConfig{Loopback: true, Private: true}
+		}
+		log.Printf("proxy: client address from %s", h)
+	}
+	app := fiber.New(fcfg)
 	app.Use(recover.New())
 	app.Use(logger.New())
 	app.Get("/static*", static.New("", static.Config{FS: web.Static(), MaxAge: 3600}))
 	app.Use(middleware.LoadUser(store))
+	rl := cfg.RateLimits
+	app.Use(middleware.RateLimit(middleware.Window(rl.Guests.Requests, rl.Guests.PerSeconds), middleware.Window(rl.Users.Requests, rl.Users.PerSeconds)))
 	app.Use(csrf.New(csrf.Config{
 		Extractor:      extractors.FromForm("_csrf"),
 		CookieSecure:   cfg.Server.CookieSecure,
@@ -78,15 +93,11 @@ func main() {
 		CookieSameSite: "Lax",
 	}))
 
-	hub := realtime.NewHub()
-	routes.Register(app, controllers.New(store, cfg, hub))
-	if cfg.Chat.RetentionHours > 0 {
-		go purgeChat(ctx, store, time.Duration(cfg.Chat.RetentionHours)*time.Hour)
-	}
+	routes.Register(app, controllers.New(store, cfg))
+	go purgeAccounts(ctx, store)
 
 	go func() {
 		<-ctx.Done()
-		hub.Close()
 		app.ShutdownWithTimeout(10 * time.Second)
 	}()
 

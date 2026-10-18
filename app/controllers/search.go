@@ -10,10 +10,8 @@ import (
 	"maidcafe-engine/web/templates"
 )
 
-var searchScopes = []string{"all", "notes", "threads", "users", "tags"}
-
-func searchScope(s string) string {
-	for _, v := range searchScopes {
+func searchScope(s string, loggedIn bool) string {
+	for _, v := range templates.SearchScopes(loggedIn) {
 		if v == s {
 			return v
 		}
@@ -24,8 +22,10 @@ func searchScope(s string) string {
 func (ctl *Controller) Search(c fiber.Ctx) error {
 	ctx := c.Context()
 	q := models.CleanQuery(c.Query("q"))
-	scope := searchScope(c.Query("in"))
-	p := page(c, "Search")
+	viewer := viewerID(c)
+	guest := viewer == 0
+	scope := searchScope(c.Query("in"), !guest)
+	p := ctl.page(c, "Search")
 
 	switch {
 	case strings.HasPrefix(q, "#"):
@@ -43,13 +43,15 @@ func (ctl *Controller) Search(c fiber.Ctx) error {
 		}
 		q, scope = models.NormalizeUsername(q[1:]), "users"
 	}
+	if guest && (scope == "users" || scope == "tags") {
+		scope = "all"
+	}
 	p.Query, p.Scope = q, scope
 	v := templates.SearchView{Query: q, Scope: scope, PostsPerPage: ctl.Config.Pagination.Posts}
 	if q == "" {
 		return render(c, fiber.StatusOK, templates.SearchPage(p, v))
 	}
 
-	viewer := viewerID(c)
 	if scope == "all" {
 		const each = 5
 		var err error
@@ -62,11 +64,13 @@ func (ctl *Controller) Search(c fiber.Ctx) error {
 		if v.Threads, err = ctl.Store.SearchThreads(ctx, q, each, 0); err != nil {
 			return err
 		}
-		if v.Users, err = ctl.Store.SearchUsers(ctx, viewer, q, each, 0); err != nil {
-			return err
-		}
-		if v.Tags, err = ctl.Store.SearchTags(ctx, q, each, 0); err != nil {
-			return err
+		if !guest {
+			if v.Users, err = ctl.Store.SearchUsers(ctx, viewer, q, each, 0); err != nil {
+				return err
+			}
+			if v.Tags, err = ctl.Store.SearchTags(ctx, q, each, 0); err != nil {
+				return err
+			}
 		}
 		v.Each = each
 		return render(c, fiber.StatusOK, templates.SearchPage(p, v))

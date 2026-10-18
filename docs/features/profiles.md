@@ -6,7 +6,7 @@ Every user has a page at `/u/:name`:
 ┌──────────────────────────────────────────┐
 │  (text art, exactly as typed)            │
 │ - - - - - - - - - - - - - - - - - - - -  │
-│  ~username       [message] [follow]      │
+│  ~username                      [follow] │
 │  bio, rendered as markdown               │
 │  member since 2026-10-16 06:17           │
 └──────────────────────────────────────────┘
@@ -15,8 +15,7 @@ Every user has a page at `/u/:name`:
 notes, replies (with "re: ~x") and reposts
 ```
 
-On your own profile the buttons are replaced by `[edit profile]`. `message` opens a private
-conversation ([dms.md](dms.md)); `follow` is described in
+On your own profile the button is replaced by `[edit profile]`. `follow` is described in
 [users-and-following.md](users-and-following.md).
 
 ## Settings (`/settings`)
@@ -36,6 +35,9 @@ Two buttons:
 
 Under the art box is a column ruler (`----+----1----+----2 … ----8`) that lines up with the
 textarea so you can see the 80-column limit.
+
+Below the profile form is the **delete account** section; see
+[accounts.md](accounts.md#deleting-your-account).
 
 ## Text art rules
 

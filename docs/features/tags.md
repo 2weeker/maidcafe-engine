@@ -3,6 +3,10 @@
 Tags are short labels that can be attached to **notes** and **threads**. They are created on
 their own page, then picked from a dropdown when composing; nobody types a tag into a post.
 
+Tag pages, the tags list and the tags sidebar panel are members-only; logged-out visitors are
+sent to `/login` ([accounts.md](accounts.md#logged-out-visitors)). Tag chips still show on
+notes and threads for everyone.
+
 ## Creating tags (`/tags`)
 
 Logged-in users see a `#` input and a `create tag` button at the top of the tags page.

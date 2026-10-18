@@ -93,12 +93,20 @@ func TestEnvOverridesFile(t *testing.T) {
 
 func TestInvalidConfigs(t *testing.T) {
 	tests := map[string]struct{ yaml, want string }{
-		"unknown key":          {"boards:\n  defaults:\n    bump_limt: 5\n", "bump_limt"},
-		"bump over post limit": {"boards:\n  defaults:\n    bump_limit: 2000\n", "can't exceed post_limit"},
-		"bad override":         {"boards:\n  overrides:\n    tech:\n      max_threads: 0\n", "boards.overrides.tech.max_threads"},
-		"zero page size":       {"pagination:\n  posts: 0\n", "pagination.posts"},
-		"tag too long":         {"tags:\n  max_length: 40\n", "tags.max_length"},
-		"negative tags":        {"tags:\n  max_per_post: -1\n", "tags.max_per_post"},
+		"unknown key":           {"boards:\n  defaults:\n    bump_limt: 5\n", "bump_limt"},
+		"bump over post limit":  {"boards:\n  defaults:\n    bump_limit: 2000\n", "can't exceed post_limit"},
+		"bad override":          {"boards:\n  overrides:\n    tech:\n      max_threads: 0\n", "boards.overrides.tech.max_threads"},
+		"zero page size":        {"pagination:\n  posts: 0\n", "pagination.posts"},
+		"tag too long":          {"tags:\n  max_length: 40\n", "tags.max_length"},
+		"negative tags":         {"tags:\n  max_per_post: -1\n", "tags.max_per_post"},
+		"short captcha":         {"captcha:\n  length: 2\n", "captcha.length"},
+		"captcha lifetime":      {"captcha:\n  lifetime_seconds: 5\n", "captcha.lifetime_seconds"},
+		"zero lockout failures": {"captcha:\n  lockout:\n    failures: 0\n", "captcha.lockout.failures"},
+		"negative rate":         {"rate_limits:\n  guests:\n    requests: -1\n", "rate_limits.guests"},
+		"rate without window":   {"rate_limits:\n  users:\n    requests: 5\n    per_seconds: 0\n", "rate_limits.users.per_seconds"},
+		"empty about title":     {"about:\n  title: \"\"\n", "about.title"},
+		"zero guest notes":      {"guests:\n  notes: 0\n", "guests.notes"},
+		"negative guest boards": {"guests:\n  boards: -1\n", "guests.boards"},
 	}
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
@@ -117,5 +125,34 @@ func TestTagDefaults(t *testing.T) {
 	}
 	if cfg.Tags.MaxLength != 12 || cfg.Tags.MaxPerPost != 3 {
 		t.Fatalf("got %+v", cfg.Tags)
+	}
+}
+
+func TestSecurityDefaults(t *testing.T) {
+	cfg, err := load(t, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !cfg.Captcha.Enabled || !cfg.Captcha.Honeypot || cfg.Captcha.Length != 6 {
+		t.Errorf("captcha and honeypot are on by default with six letters: %+v", cfg.Captcha)
+	}
+	if !cfg.Registration.Enabled || cfg.Registration.ClosedMessage == "" {
+		t.Errorf("registration is open by default and has a closed message ready: %+v", cfg.Registration)
+	}
+	if !cfg.About.Enabled || cfg.About.Body == "" {
+		t.Error("the about page is on by default with placeholder text")
+	}
+	if cfg.RateLimits.Guests.Requests == 0 || cfg.RateLimits.Users.Requests == 0 {
+		t.Error("rate limits are on by default")
+	}
+}
+
+func TestRateLimitCanBeDisabled(t *testing.T) {
+	cfg, err := load(t, "rate_limits:\n  guests:\n    requests: 0\n    per_seconds: 0\n")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.RateLimits.Guests.Requests != 0 || cfg.RateLimits.Users.Requests != 120 {
+		t.Errorf("only the guest limit is off: %+v", cfg.RateLimits)
 	}
 }

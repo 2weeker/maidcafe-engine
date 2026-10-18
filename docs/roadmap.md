@@ -4,22 +4,22 @@
 
 - **Top sort is all-time.** Old popular notes stay on top forever. A time window (today / week)
   belongs in `config.yaml`.
-- **No editing or deleting** notes or posts. Futaba-style self-delete (leaving a "post deleted"
+- **Moderation is manual:** there's no report button, no word filters, no IP-level tooling,
+  and no appeal flow for bans. Futaba-style self-delete (leaving a "post deleted"
   placeholder so numbering and `>>N` stay intact) is the planned approach.
 - **No notifications** for likes, reposts, replies or `>>N` mentions.
-- **No rate limiting** on registration or posting.
-- **No moderation:** no roles, reports, bans, or capcodes.
-- **Boards live in the database,** seeded by the first migration; there's no admin UI or config
-  for them.
+- **Captchas, lockouts and rate-limit counters are in memory.** A restart clears them, and
+  several app instances wouldn't share them.
+- **The captcha has no audio or text alternative.** Turning it off keeps the honeypot and rate
+  limits as the fallback.
 - **Text limits are constants** (note 300, post 4000, title 120, bio 500, art 24×80). Tag
   length and tags-per-post are configurable.
 - **Tags can't be edited or removed** from a post, and tags themselves can't be renamed or
   deleted (no moderation yet).
 - **Search has no stemming** (`brew` doesn't match `brewing`) and doesn't search profile art.
 - **Following has no notifications,** and the following feed doesn't include replies.
-- **Chats** have no per-message deleting, blocking, muting, kicking, moderators, channel topics
-  or read receipts, and messages are stored unencrypted (until the retention sweep removes them). The live stream's hub is in-process, so multiple app instances would need
-  Postgres `LISTEN/NOTIFY` (or similar) between them.
+- **No private messaging.** A DM/chat feature was built and then removed to keep the site
+  JavaScript-free; it's in git history (`git log -- app/controllers/dm.go`) if ever wanted back.
 - **CSRF tokens live in process memory,** so running several app instances needs shared storage.
 - **Expired sessions aren't swept** (they're ignored, just not deleted).
 - **Formatting renders on every view.** Fine at this size; cache rendered HTML if busy pages slow down.
@@ -47,6 +47,4 @@
 | Post ranges in URLs | `/t/42/l50`, `/t/42/100-200`, `/t/42/5` |
 | "New since last visit" | An unread marker per thread, "3 new" on the board list |
 | Hide threads/posts | A per-user `[hide]` |
-| Greentext styling | `>text` (no space) rendered in muted italic |
-| Spoilers | `[spoiler]…[/spoiler]` revealed on hover/focus |
 | Dice and fortunes | `!dice 2d6`, `!omikuji`, rolled when the post is saved |

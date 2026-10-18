@@ -16,30 +16,26 @@ templ Layout(p Page) {
 			<link rel="stylesheet" href="/static/css/style.css"/>
 		</head>
 		<body>
-			<div class="wrap">
+			<div class="wrap" id="top">
 				<header class="masthead box">
 					<a href="/" class="banner-link"><pre class="banner" aria-label="maidcafe">{ banner }</pre></a>
 					<nav class="nav">
 						<a href="/">[home]</a>
-						<a href="/boards">[boards]</a>
-						<a href="/users">[users]</a>
-						<a href="/tags">[tags]</a>
 						@themeToggle(p)
 						if p.User != nil {
-							if p.Unread > 0 {
-								<a href="/dm" class="unread">[dm { itoa(p.Unread) }]</a>
-							} else {
-								<a href="/dm">[dm]</a>
+							if p.User.IsMod() {
+								<a href="/admin">[admin]</a>
 							}
 							<a href={ templ.URL(userURL(p.User.Username)) }>[~{ p.User.Username }]</a>
-							<a href="/settings">[settings]</a>
 							<form method="post" action="/logout" class="inline">
 								@csrfField(p)
 								<button type="submit" class="link">[logout]</button>
 							</form>
 						} else {
 							<a href="/login">[login]</a>
-							<a href="/register">[register]</a>
+							if Site.RegistrationOpen {
+								<a href="/register">[register]</a>
+							}
 						}
 					</nav>
 				</header>
@@ -47,11 +43,32 @@ templ Layout(p Page) {
 				if p.Error != "" {
 					<div class="box alert" role="alert">!! { p.Error }</div>
 				}
+				if p.User != nil && p.User.Banned() {
+					<div class="box alert" role="alert">
+						!! your account is banned. you can read but not post.
+						if p.User.BanReason != "" {
+							reason: { p.User.BanReason }
+						}
+					</div>
+				}
+				if p.User != nil && p.User.DeleteAt != nil {
+					<div class="box alert doom" role="alert">
+						!! your account and everything you've posted will be deleted on { stamp(*p.User.DeleteAt) } UTC.
+						<form method="post" action="/settings/undelete" class="inline">
+							@csrfField(p)
+							<input type="hidden" name="next" value={ p.Path }/>
+							<button type="submit" class="link">[keep my account]</button>
+						</form>
+					</div>
+				}
 				<main>
 					{ children... }
 				</main>
-				<footer class="footer">
+				<footer class="footer" id="bottom">
 					<pre>{ footerArt }</pre>
+					if Site.About {
+						<a href="/about" class="footer-link">[{ Site.AboutTitle }]</a>
+					}
 				</footer>
 			</div>
 		</body>
@@ -62,7 +79,7 @@ templ themeToggle(p Page) {
 	<form method="post" action="/theme" class="inline">
 		@csrfField(p)
 		<input type="hidden" name="next" value={ p.Path }/>
-		<button type="submit" name="theme" value={ NextTheme(p.Theme) } class="link" title={ "switch to " + NextTheme(p.Theme) }>[theme: { p.Theme }]</button>
+		<button type="submit" name="theme" value={ NextTheme(p.Theme) } class="link" title={ "switch to " + NextTheme(p.Theme) }>[{ p.Theme }]</button>
 	</form>
 }
 
@@ -84,6 +101,14 @@ templ pagerNav(pg models.Pager, base, prevLabel, nextLabel string) {
 	}
 }
 
+templ jumpDown() {
+	<nav class="jump" aria-label="jump to bottom"><a href="#bottom" class="act">v bottom</a></nav>
+}
+
+templ jumpUp() {
+	<nav class="jump up" aria-label="jump to top"><a href="#top" class="act">^ top</a></nav>
+}
+
 templ csrfField(p Page) {
 	<input type="hidden" name="_csrf" value={ p.CSRF }/>
 }
@@ -93,7 +118,11 @@ templ sectionHead(title string) {
 }
 
 templ loginPrompt(action string) {
-	<p class="box muted"><a href="/login">log in</a> or <a href="/register">register</a> to { action }.</p>
+	if Site.RegistrationOpen {
+		<p class="box muted"><a href="/login">log in</a> or <a href="/register">register</a> to { action }.</p>
+	} else {
+		<p class="box muted"><a href="/login">log in</a> to { action }.</p>
+	}
 }
 
 templ ErrorPage(p Page, code int, msg string) {
@@ -111,5 +140,5 @@ templ markdown(src string) {
 }
 
 templ formatHint() {
-	<p class="hint">**bold** *italic* ~~strike~~ `code` ```block``` [link](url) &gt; quote &gt;&gt;1 [aa]art[/aa]</p>
+	<p class="hint">**bold** *italic* ~~strike~~ `code` ```block``` [link](url) &gt; quote &gt;text [spoiler]hidden[/spoiler] &gt;&gt;1 [aa]art[/aa]</p>
 }

@@ -12,15 +12,15 @@ import (
 )
 
 type Page struct {
-	Title  string
-	User   *models.User
-	CSRF   string
-	Error  string
-	Theme  string
-	Path   string
-	Query  string
-	Scope  string
-	Unread int
+	Title      string
+	User       *models.User
+	CSRF       string
+	Error      string
+	Theme      string
+	Path       string
+	Query      string
+	Scope      string
+	GraceHours int
 }
 
 type ThreadDraft struct {
@@ -114,15 +114,13 @@ func PageURL(base string, page int) string {
 
 func NoteURL(id int64) string   { return fmt.Sprintf("/n/%d", id) }
 func TagURL(name string) string { return "/tags/" + name }
-func DMURL(name string) string  { return "/dm/" + name }
 
-func snippet(s string, n int) string {
-	s = strings.Join(strings.Fields(s), " ")
-	if utf8.RuneCountInString(s) <= n {
-		return s
-	}
-	r := []rune(s)
-	return string(r[:n]) + "…"
+func postEditURL(threadID int64, no int) string {
+	return fmt.Sprintf("/t/%d/p/%d/edit", threadID, no)
+}
+
+func postDeleteURL(threadID int64, no int) string {
+	return fmt.Sprintf("/t/%d/p/%d/delete", threadID, no)
 }
 
 func urlQuery(s string) string { return url.QueryEscape(s) }

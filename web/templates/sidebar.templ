@@ -2,7 +2,7 @@ package templates
 
 import "maidcafe-engine/app/models"
 
-templ sidebar(boards []models.Board, moreBoards bool, users []models.UserCard, tags []models.Tag) {
+templ sidebar(p Page, boards []models.Board, moreBoards bool, users []models.UserCard, tags []models.Tag) {
 	<aside class="col-side">
 		@sectionHead("boards")
 		<ul class="board-list">
@@ -15,39 +15,51 @@ templ sidebar(boards []models.Board, moreBoards bool, users []models.UserCard, t
 				</li>
 			}
 		</ul>
-		<p class="more-boards">
+		if p.User == nil {
 			if moreBoards {
-				<a href="/boards" class="act">more boards &gt;&gt;</a>
-			} else {
-				<a href="/boards" class="act">all boards &gt;&gt;</a>
+				@loginPrompt("see all boards")
 			}
-		</p>
-		@sectionHead("users")
-		<section class="box side-panel">
-			<ul class="user-list">
-				for _, u := range users {
-					<li>
-						<a href={ templ.URL(userURL(u.Username)) } class="author">~{ u.Username }</a>
-						<span class="muted small">joined { stamp(u.CreatedAt) } :: { plural(u.Followers, "follower") }</span>
-					</li>
+		} else {
+			<p class="more-boards">
+				if moreBoards {
+					<a href="/boards" class="act">more boards &gt;&gt;</a>
+				} else {
+					<a href="/boards" class="act">all boards &gt;&gt;</a>
+				}
+			</p>
+		}
+		if p.User != nil {
+			@sidebarPanels(users, tags)
+		}
+	</aside>
+}
+
+templ sidebarPanels(users []models.UserCard, tags []models.Tag) {
+	@sectionHead("users")
+	<section class="box side-panel">
+		<ul class="user-list">
+			for _, u := range users {
+				<li>
+					<a href={ templ.URL(userURL(u.Username)) } class="author">~{ u.Username }</a>
+					<span class="muted small">joined { stamp(u.CreatedAt) } :: { plural(u.Followers, "follower") }</span>
+				</li>
+			}
+		</ul>
+		<p class="panel-foot"><a href="/users">[all users]</a></p>
+	</section>
+	@sectionHead("tags")
+	<section class="box side-panel">
+		if len(tags) == 0 {
+			<p class="muted small">no tags yet.</p>
+		} else {
+			<ul class="tag-cloud">
+				for _, t := range tags {
+					<li><a href={ templ.URL(TagURL(t.Name)) } class={ "tagchip", tagWeight(t.Uses(), tags[0].Uses()) }>#{ t.Name } <span class="muted">{ itoa(t.Uses()) }</span></a></li>
 				}
 			</ul>
-			<p class="panel-foot"><a href="/users">[all users]</a></p>
-		</section>
-		@sectionHead("tags")
-		<section class="box side-panel">
-			if len(tags) == 0 {
-				<p class="muted small">no tags yet.</p>
-			} else {
-				<ul class="tag-cloud">
-					for _, t := range tags {
-						<li><a href={ templ.URL(TagURL(t.Name)) } class={ "tagchip", tagWeight(t.Uses(), tags[0].Uses()) }>#{ t.Name } <span class="muted">{ itoa(t.Uses()) }</span></a></li>
-					}
-				</ul>
-			}
-			<p class="panel-foot"><a href="/tags">[all tags]</a></p>
-		</section>
-	</aside>
+		}
+		<p class="panel-foot"><a href="/tags">[all tags]</a></p>
+	</section>
 }
 
 templ searchBar(p Page) {
@@ -55,8 +67,8 @@ templ searchBar(p Page) {
 		<label for="site-search" class="search-label">search://</label>
 		<input id="site-search" class="search-input" type="search" name="q" value={ p.Query } placeholder="notes, threads, ~users, #tags" autocomplete="off"/>
 		<select name="in" class="search-scope" aria-label="search scope">
-			for _, s := range []string{"all", "notes", "threads", "users", "tags"} {
-				<option value={ s } selected?={ s == p.Scope }>{ s }</option>
+			for _, s := range SearchScopes(p.User != nil) {
+				<option value={ s } selected?={ s == p.Scope }>{ scopeLabel(s) }</option>
 			}
 		</select>
 		<button type="submit" class="search-go">go &gt;&gt;</button>

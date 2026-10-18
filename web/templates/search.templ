@@ -16,11 +16,11 @@ templ searchBody(p Page, v SearchView) {
 		} else {
 			<h1 class="huge">results <span class="thin">:: <q>{ v.Query }</q></span></h1>
 			<nav class="tabs" aria-label="scope">
-				for _, s := range []string{"all", "notes", "threads", "users", "tags"} {
+				for _, s := range SearchScopes(p.User != nil) {
 					if s == v.Scope {
-						<span class="tab on" aria-current="page">{ s }</span>
+						<span class="tab on" aria-current="page">{ scopeLabel(s) }</span>
 					} else {
-						<a class="tab" href={ templ.URL(searchURL(v.Query, s)) }>{ s }</a>
+						<a class="tab" href={ templ.URL(searchURL(v.Query, s)) }>{ scopeLabel(s) }</a>
 					}
 				}
 			</nav>

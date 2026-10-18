@@ -11,7 +11,7 @@ import (
 )
 
 func (ctl *Controller) Tags(c fiber.Ctx) error {
-	return ctl.renderTags(c, fiber.StatusOK, page(c, "Tags"), "")
+	return ctl.renderTags(c, fiber.StatusOK, ctl.page(c, "Tags"), "")
 }
 
 func (ctl *Controller) CreateTag(c fiber.Ctx) error {
@@ -19,7 +19,7 @@ func (ctl *Controller) CreateTag(c fiber.Ctx) error {
 	tag, err := ctl.Store.CreateTag(c.Context(), middleware.CurrentUser(c).ID, name, ctl.Config.Tags.MaxLength)
 	var bad models.BadTagError
 	if errors.Is(err, models.ErrTagTaken) || errors.As(err, &bad) {
-		p := page(c, "Tags")
+		p := ctl.page(c, "Tags")
 		p.Error = err.Error()
 		return ctl.renderTags(c, fiber.StatusUnprocessableEntity, p, name)
 	}
@@ -84,5 +84,5 @@ func (ctl *Controller) TagPage(c fiber.Ctx) error {
 		}
 		v.Notes, v.Pager = models.Trim(&pg, notes), pg
 	}
-	return render(c, fiber.StatusOK, templates.TagPage(page(c, "#"+tag.Name), v))
+	return render(c, fiber.StatusOK, templates.TagPage(ctl.page(c, "#"+tag.Name), v))
 }

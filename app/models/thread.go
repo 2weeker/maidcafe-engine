@@ -27,6 +27,8 @@ type Thread struct {
 	CreatedAt  time.Time
 	BumpedAt   time.Time
 	ArchivedAt *time.Time
+	LockedAt   *time.Time
+	Pinned     bool
 	Tags       []string
 }
 
@@ -40,6 +42,10 @@ type Post struct {
 	Body      string
 	Sage      bool
 	CreatedAt time.Time
+	EditedAt  *time.Time
+	DeletedAt *time.Time
+	Removed   bool
+	AuthorID  int64
 }
 
 type ThreadPreview struct {
@@ -54,13 +60,13 @@ func cleanText(s string, max int) (string, bool) {
 	return s, n >= 1 && n <= max
 }
 
-const threadCols = `t.id, t.board_id, b.slug, t.title, u.username, t.reply_count, t.created_at, t.bumped_at, t.archived_at,
+const threadCols = `t.id, t.board_id, b.slug, t.title, coalesce(u.username, 'deleted'), t.reply_count, t.created_at, t.bumped_at, t.archived_at, t.locked_at, t.pinned,
 	coalesce((SELECT array_agg(g.name ORDER BY g.name) FROM thread_tags tt JOIN tags g ON g.id = tt.tag_id WHERE tt.thread_id = t.id), '{}'::text[])
-	FROM threads t JOIN users u ON u.id = t.user_id JOIN boards b ON b.id = t.board_id`
+	FROM threads t LEFT JOIN users u ON u.id = t.user_id JOIN boards b ON b.id = t.board_id`
 
 func scanThread(r pgx.Row) (Thread, error) {
 	var t Thread
-	err := r.Scan(&t.ID, &t.BoardID, &t.BoardSlug, &t.Title, &t.Author, &t.ReplyCount, &t.CreatedAt, &t.BumpedAt, &t.ArchivedAt, &t.Tags)
+	err := r.Scan(&t.ID, &t.BoardID, &t.BoardSlug, &t.Title, &t.Author, &t.ReplyCount, &t.CreatedAt, &t.BumpedAt, &t.ArchivedAt, &t.LockedAt, &t.Pinned, &t.Tags)
 	return t, err
 }
 
@@ -75,7 +81,7 @@ func (s *Store) queryThreads(ctx context.Context, sql string, args ...any) ([]Th
 func (s *Store) LiveThreads(ctx context.Context, boardID int64, limit, offset int) ([]Thread, error) {
 	return s.queryThreads(ctx, `SELECT `+threadCols+`
 		WHERE t.board_id = $1 AND t.archived_at IS NULL
-		ORDER BY t.bumped_at DESC, t.id DESC LIMIT $2 OFFSET $3`, boardID, limit, offset)
+		ORDER BY t.pinned DESC, t.bumped_at DESC, t.id DESC LIMIT $2 OFFSET $3`, boardID, limit, offset)
 }
 
 func (s *Store) ArchivedThreads(ctx context.Context, boardID int64, limit, offset int) ([]Thread, error) {
@@ -142,7 +148,7 @@ func (s *Store) CreateReply(ctx context.Context, threadID, userID int64, body st
 		err := tx.QueryRow(ctx, `UPDATE threads SET
 				reply_count = reply_count + 1,
 				bumped_at = CASE WHEN $2 OR reply_count + 2 > $3 THEN bumped_at ELSE now() END
-			WHERE id = $1 AND archived_at IS NULL AND reply_count + 1 < $4
+			WHERE id = $1 AND archived_at IS NULL AND locked_at IS NULL AND reply_count + 1 < $4
 			RETURNING reply_count + 1`,
 			threadID, opt.Sage, opt.BumpLimit, opt.PostLimit).Scan(&no)
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -172,8 +178,8 @@ func (s *Store) CreateReply(ctx context.Context, threadID, userID int64, body st
 }
 
 func (s *Store) whyNoReply(ctx context.Context, tx pgx.Tx, threadID int64) error {
-	var archived bool
-	err := tx.QueryRow(ctx, `SELECT archived_at IS NOT NULL FROM threads WHERE id = $1`, threadID).Scan(&archived)
+	var archived, locked bool
+	err := tx.QueryRow(ctx, `SELECT archived_at IS NOT NULL, locked_at IS NOT NULL FROM threads WHERE id = $1`, threadID).Scan(&archived, &locked)
 	switch {
 	case errors.Is(err, pgx.ErrNoRows):
 		return ErrNotFound
@@ -181,12 +187,17 @@ func (s *Store) whyNoReply(ctx context.Context, tx pgx.Tx, threadID int64) error
 		return err
 	case archived:
 		return ErrThreadArchived
+	case locked:
+		return ErrThreadLocked
 	}
 	return ErrThreadFull
 }
 
-const postCols = `p.id, p.thread_id, p.no, u.username, p.body, p.sage, p.created_at
-	FROM posts p JOIN users u ON u.id = p.user_id`
+const postCols = `p.id, p.thread_id, p.no, coalesce(u.username, 'deleted'),
+	CASE WHEN p.user_id IS NULL THEN '[deleted]' WHEN p.deleted_at IS NOT NULL AND p.removed THEN '[removed by moderator]'
+	     WHEN p.deleted_at IS NOT NULL THEN '[deleted]' ELSE p.body END,
+	p.sage, p.created_at, p.edited_at, p.deleted_at, p.removed, coalesce(p.user_id, 0)
+	FROM posts p LEFT JOIN users u ON u.id = p.user_id`
 
 func (s *Store) queryPosts(ctx context.Context, sql string, args ...any) ([]Post, error) {
 	rows, err := s.DB.Query(ctx, sql, args...)
@@ -195,7 +206,7 @@ func (s *Store) queryPosts(ctx context.Context, sql string, args ...any) ([]Post
 	}
 	return pgx.CollectRows(rows, func(r pgx.CollectableRow) (Post, error) {
 		var p Post
-		err := r.Scan(&p.ID, &p.ThreadID, &p.No, &p.Author, &p.Body, &p.Sage, &p.CreatedAt)
+		err := r.Scan(&p.ID, &p.ThreadID, &p.No, &p.Author, &p.Body, &p.Sage, &p.CreatedAt, &p.EditedAt, &p.DeletedAt, &p.Removed, &p.AuthorID)
 		return p, err
 	})
 }

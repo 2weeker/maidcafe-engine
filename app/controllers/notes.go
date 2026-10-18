@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/gofiber/fiber/v3"
 
@@ -15,12 +16,15 @@ import (
 func (ctl *Controller) CreateNote(c fiber.Ctx) error {
 	body := c.FormValue("body")
 	selected := tagFields(c, ctl.Config.Tags.MaxPerPost)
+	if err := ctl.noteCooldown(c); err != nil {
+		return err
+	}
 	tagIDs, err := ctl.Store.ResolveTags(c.Context(), selected, ctl.Config.Tags.MaxPerPost)
 	if err == nil {
 		_, err = ctl.Store.CreateNote(c.Context(), middleware.CurrentUser(c).ID, body, nil, tagIDs)
 	}
 	if errors.Is(err, models.ErrBadNote) || errors.Is(err, models.ErrUnknownTag) || errors.Is(err, models.ErrTooManyTag) {
-		p := page(c, "Home")
+		p := ctl.page(c, "Home")
 		p.Error = err.Error()
 		return ctl.renderHome(c, fiber.StatusUnprocessableEntity, p, body, selected)
 	}
@@ -37,6 +41,9 @@ func (ctl *Controller) Note(c fiber.Ctx) error {
 func (ctl *Controller) ReplyNote(c fiber.Ctx) error {
 	parentID := fiber.Params[int64](c, "id")
 	body := c.FormValue("body")
+	if err := ctl.noteCooldown(c); err != nil {
+		return err
+	}
 	id, err := ctl.Store.CreateNote(c.Context(), middleware.CurrentUser(c).ID, body, &parentID, nil)
 	if errors.Is(err, models.ErrBadNote) {
 		return ctl.renderNote(c, fiber.StatusUnprocessableEntity, err.Error(), body)
@@ -73,9 +80,18 @@ func (ctl *Controller) renderNote(c fiber.Ctx, status int, errMsg, draft string)
 		return err
 	}
 	replies = models.Trim(&pg, replies)
-	p := page(c, "~"+note.Author)
+	p := ctl.page(c, "~"+note.Author)
 	p.Error = errMsg
 	return render(c, status, templates.NotePage(p, note, parent, replies, pg, draft))
+}
+
+func (ctl *Controller) noteCooldown(c fiber.Ctx) error {
+	err := ctl.Store.NoteCooldown(c.Context(), middleware.CurrentUser(c).ID, time.Duration(ctl.Config.Cooldowns.NoteSeconds)*time.Second)
+	var cd models.CooldownError
+	if errors.As(err, &cd) {
+		return fiber.NewError(fiber.StatusTooManyRequests, cd.Error())
+	}
+	return err
 }
 
 func tagFields(c fiber.Ctx, max int) []string {

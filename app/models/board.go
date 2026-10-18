@@ -12,6 +12,7 @@ type Board struct {
 	Slug         string
 	Name         string
 	Description  string
+	Position     int
 	ThreadCount  int
 	Archived     int
 	PostCount    int
@@ -20,7 +21,7 @@ type Board struct {
 
 func (s *Store) Boards(ctx context.Context) ([]Board, error) {
 	rows, err := s.DB.Query(ctx,
-		`SELECT b.id, b.slug, b.name, b.description,
+		`SELECT b.id, b.slug, b.name, b.description, b.position,
 		        (SELECT count(*) FROM threads t WHERE t.board_id = b.id AND t.archived_at IS NULL),
 		        (SELECT count(*) FROM threads t WHERE t.board_id = b.id AND t.archived_at IS NOT NULL),
 		        (SELECT coalesce(sum(t.reply_count + 1), 0) FROM threads t WHERE t.board_id = b.id),
@@ -31,7 +32,7 @@ func (s *Store) Boards(ctx context.Context) ([]Board, error) {
 	}
 	return pgx.CollectRows(rows, func(r pgx.CollectableRow) (Board, error) {
 		var b Board
-		err := r.Scan(&b.ID, &b.Slug, &b.Name, &b.Description, &b.ThreadCount, &b.Archived, &b.PostCount, &b.LastActivity)
+		err := r.Scan(&b.ID, &b.Slug, &b.Name, &b.Description, &b.Position, &b.ThreadCount, &b.Archived, &b.PostCount, &b.LastActivity)
 		return b, err
 	})
 }

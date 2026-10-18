@@ -3,6 +3,7 @@ package controllers
 import (
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/gofiber/fiber/v3"
 
@@ -12,12 +13,20 @@ import (
 	"maidcafe-engine/web/templates"
 )
 
+func cooldownError(err error) error {
+	var cd models.CooldownError
+	if errors.As(err, &cd) {
+		return fiber.NewError(fiber.StatusTooManyRequests, cd.Error())
+	}
+	return err
+}
+
 func (ctl *Controller) Board(c fiber.Ctx) error {
 	board, err := ctl.Store.BoardBySlug(c.Context(), c.Params("slug"))
 	if err != nil {
 		return err
 	}
-	return ctl.renderBoard(c, fiber.StatusOK, page(c, "/"+board.Slug+"/"), board, templates.ThreadDraft{})
+	return ctl.renderBoard(c, fiber.StatusOK, ctl.page(c, "/"+board.Slug+"/"), board, templates.ThreadDraft{})
 }
 
 func (ctl *Controller) CreateThread(c fiber.Ctx) error {
@@ -27,13 +36,20 @@ func (ctl *Controller) CreateThread(c fiber.Ctx) error {
 	}
 	rules := ctl.Config.Boards.For(board.Slug)
 	draft := templates.ThreadDraft{Title: c.FormValue("title"), Body: c.FormValue("body"), Tags: tagFields(c, ctl.Config.Tags.MaxPerPost)}
+	me := middleware.CurrentUser(c)
+	if err := cooldownError(ctl.Store.ThreadQuota(c.Context(), me.ID, ctl.Config.Cooldowns.ThreadsPerDay)); err != nil {
+		return err
+	}
+	if err := cooldownError(ctl.Store.PostCooldown(c.Context(), me.ID, time.Duration(ctl.Config.Cooldowns.PostSeconds)*time.Second)); err != nil {
+		return err
+	}
 	tagIDs, err := ctl.Store.ResolveTags(c.Context(), draft.Tags, ctl.Config.Tags.MaxPerPost)
 	var id int64
 	if err == nil {
 		id, err = ctl.Store.CreateThread(c.Context(), board.ID, middleware.CurrentUser(c).ID, draft.Title, draft.Body, rules.MaxThreads, tagIDs)
 	}
 	if errors.Is(err, models.ErrBadTitle) || errors.Is(err, models.ErrBadBody) || errors.Is(err, models.ErrUnknownTag) || errors.Is(err, models.ErrTooManyTag) {
-		p := page(c, "/"+board.Slug+"/")
+		p := ctl.page(c, "/"+board.Slug+"/")
 		p.Error = err.Error()
 		return ctl.renderBoard(c, fiber.StatusUnprocessableEntity, p, board, draft)
 	}
@@ -87,7 +103,7 @@ func (ctl *Controller) Archive(c fiber.Ctx) error {
 		return err
 	}
 	threads = models.Trim(&pg, threads)
-	return render(c, fiber.StatusOK, templates.ArchivePage(page(c, "/"+board.Slug+"/ archive"),
+	return render(c, fiber.StatusOK, templates.ArchivePage(ctl.page(c, "/"+board.Slug+"/ archive"),
 		templates.ArchiveView{Board: board, Threads: threads, Pager: pg}))
 }
 
@@ -103,6 +119,9 @@ func (ctl *Controller) Reply(c fiber.Ctx) error {
 		return err
 	}
 	rules := ctl.Config.Boards.For(thread.BoardSlug)
+	if err := cooldownError(ctl.Store.PostCooldown(c.Context(), middleware.CurrentUser(c).ID, time.Duration(ctl.Config.Cooldowns.PostSeconds)*time.Second)); err != nil {
+		return err
+	}
 	no, err := ctl.Store.CreateReply(c.Context(), id, middleware.CurrentUser(c).ID, body, models.ReplyOptions{
 		Sage:      sage,
 		BumpLimit: rules.BumpLimit,
@@ -112,7 +131,7 @@ func (ctl *Controller) Reply(c fiber.Ctx) error {
 	switch {
 	case errors.Is(err, models.ErrBadBody):
 		return ctl.renderThread(c, fiber.StatusUnprocessableEntity, err.Error(), body, sage)
-	case errors.Is(err, models.ErrThreadFull), errors.Is(err, models.ErrThreadArchived):
+	case errors.Is(err, models.ErrThreadFull), errors.Is(err, models.ErrThreadArchived), errors.Is(err, models.ErrThreadLocked):
 		return ctl.renderThread(c, fiber.StatusConflict, err.Error(), body, sage)
 	case err != nil:
 		return err
@@ -147,7 +166,7 @@ func (ctl *Controller) renderThread(c fiber.Ctx, status int, errMsg, draft strin
 		draft = fmt.Sprintf(">>%d\n", q)
 	}
 
-	p := page(c, thread.Title)
+	p := ctl.page(c, thread.Title)
 	p.Error = errMsg
 	return render(c, status, templates.ThreadPage(p, templates.ThreadView{
 		Thread:       thread,

@@ -35,6 +35,9 @@ Following nobody yet shows a hint pointing to the users page.
 
 ## The users page (`/users`)
 
+Members only: the users page, the follower and following lists and the users sidebar panel all
+require a login ([accounts.md](accounts.md#logged-out-visitors)). Profiles stay public.
+
 A grid of user cards, each with the name, follower and note counts, join date, the bio, and a
 follow button. Sortable:
 

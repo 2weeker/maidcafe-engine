@@ -2,7 +2,7 @@
 
 ## Themes
 
-One button in the nav, `[theme: light]`, cycles through three themes:
+One button in the nav, showing the current theme's name (`[light]`), cycles through three themes:
 
 ```
 light  ->  eyesaver  ->  dark  ->  light ...
@@ -24,7 +24,7 @@ light  ->  eyesaver  ->  dark  ->  light ...
 
 ```
 ┌──────────────────────────────────────────────┐▌  masthead: ASCII banner + nav, the one box
-│  __  __   _   ___ ...      [home] [theme: …] │▌  with a hard offset shadow
+│  __  __   _   ___ ...          [home] [light] │▌  with a hard offset shadow
 └──────────────────────────────────────────────┘▌
 ▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀
 [search://][ notes, threads, ~users, #tags   ][all ▾][go >>]
@@ -39,11 +39,15 @@ light  ->  eyesaver  ->  dark  ->  light ...
 +--------------------------------------+
 ```
 
-Nav: `[home] [boards] [users] [tags] [theme: …]`, then `[dm] [~you] [settings] [logout]` (`[dm 3]`
-inverted when you have unread messages) or `[login] [register]`.
+Nav: `[home] [light]` (the theme button), then `[admin]` (mods only) `[~you] [logout]` or
+`[login] [register]`. Boards,
+users and tags are reached from the home sidebar (`more boards >>`, `[all users]`, `[all tags]`)
+and settings from `[edit profile]` on your own profile.
 
-The sidebar appears on the home page. On phones (< 720px) the columns stack and the sidebar
-moves below the feed.
+The sidebar appears on the home page. On wider screens it's sticky: it stays in view, 16px from
+the top, as you scroll the feed. It has no scrollbar of its own, so if it is taller than the
+window its lower part comes into view only once the page is scrolled to the bottom. On phones
+(< 720px) the columns stack and the sidebar moves below the feed.
 
 ## Search bar
 
@@ -58,6 +62,21 @@ your query on the results page. On phones the `search://` label hides to save ro
   `/boards`.
 - **users:** the five newest members with join date and follower count, and `[all users]`.
 - **tags:** the twelve most-used tags as chips, sized by use, and `[all tags]`.
+
+Logged out, the sidebar shows only `guests.boards` boards (default 1) and a login prompt; the
+users and tags panels are members-only ([accounts.md](accounts.md#logged-out-visitors)).
+
+## Jump links
+
+Long pages carry a centered `v bottom` button at the top and a `^ top` button at the bottom: the home
+feed, board indexes, threads and archives. On the home notes feed both are right-aligned
+instead: `v bottom` at the right end of the sort tabs row, `^ top` under the last note. They're plain `#bottom` / `#top` anchor links to the
+page wrapper and the footer, so they work with no JavaScript and show up in the URL.
+
+## Footer
+
+The ASCII box under every page, with an `[about]` link beneath it when the about page is on. The
+link's label is the configured `about.title` ([about.md](about.md)).
 
 ## Pagination
 

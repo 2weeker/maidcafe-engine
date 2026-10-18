@@ -53,7 +53,7 @@ Every color comes from these tokens, so a theme is just a block that reassigns t
 | **Placeholder box** | Dashed border: "not real yet" (sidebar users/tags) |
 | **Buttons** | Solid ink with paper text, 2px border, 4px radius; hover inverts |
 | **Secondary button** | Paper with ink text (`preview`) |
-| **Action pills** (`.act`) | 1px border, mono 13px: `reply 3`, `like 5`; solid ink when active (`liked`, `reposted`) |
+| **Action pills** (`.act`) | 1px border, mono 13px: `↳ 3` reply, `↰ 1` repost, `<3 5` like; solid ink when active. Notes and posts have no rules between header, body and actions, just spacing |
 | **Tabs** | Bordered pills, the current one solid |
 | **Tags** | 1px border, tiny caps: `OP`, `sage` (dashed), `full`, `bump limit`, `archived` |
 | **Quotes** | 3px left rule, muted text |

@@ -1,6 +1,8 @@
 server:
   listen_addr: ":8080"
   cookie_secure: false
+  proxy_header: ""
+  trusted_proxies: []
 
 database:
   url: "postgres://maidcafe:maidcafe@localhost:5432/maidcafe?sslmode=disable"
@@ -14,7 +16,6 @@ pagination:
   users: 30
   tags: 60
   search: 20
-  messages: 50
 
 tags:
   max_length: 8
@@ -25,8 +26,60 @@ sidebar:
   users: 5
   tags: 12
 
-chat:
-  retention_hours: 24
+guests:
+  notes: 10
+  boards: 1
+
+accounts:
+  deletion_grace_hours: 24
+
+captcha:
+  enabled: true
+  length: 6
+  lifetime_seconds: 300
+  honeypot: true
+  lockout:
+    failures: 3
+    seconds: 900
+
+rate_limits:
+  guests:
+    requests: 60
+    per_seconds: 60
+  users:
+    requests: 120
+    per_seconds: 60
+  auth_attempts:
+    requests: 10
+    per_seconds: 300
+  registrations:
+    requests: 3
+    per_seconds: 86400
+
+registration:
+  enabled: true
+  closed_message: "registration is closed right now. check back later."
+
+about:
+  enabled: true
+  title: "about"
+  body: |
+    Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.
+
+    Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.
+
+    > Curabitur pretium tincidunt lacus. Nulla gravida orci a odio.
+
+    Nullam varius, turpis et commodo pharetra, est eros bibendum elit, nec luctus magna felis sollicitudin mauris. Integer in mauris eu nibh euismod gravida.
+
+admin:
+  usernames:
+    - testr
+
+cooldowns:
+  post_seconds: 20
+  note_seconds: 10
+  threads_per_day: 10
 
 boards:
   defaults:

@@ -11,30 +11,39 @@ import (
 	"maidcafe-engine/app/config"
 	"maidcafe-engine/app/middleware"
 	"maidcafe-engine/app/models"
-	"maidcafe-engine/app/realtime"
 	"maidcafe-engine/web/templates"
 )
 
 type Controller struct {
 	Store  *models.Store
 	Config config.Config
-	Hub    *realtime.Hub
+	Guards Guards
 }
 
-func New(store *models.Store, cfg config.Config, hub *realtime.Hub) *Controller {
-	return &Controller{Store: store, Config: cfg, Hub: hub}
+func New(store *models.Store, cfg config.Config) *Controller {
+	templates.Site = templates.SiteSettings{
+		RegistrationOpen: cfg.Registration.Enabled,
+		About:            cfg.About.Enabled,
+		AboutTitle:       cfg.About.Title,
+	}
+	return &Controller{Store: store, Config: cfg, Guards: newGuards(cfg)}
 }
 
-func page(c fiber.Ctx, title string) templates.Page {
+func (ctl *Controller) page(c fiber.Ctx, title string) templates.Page {
+	p := basePage(c, title)
+	p.GraceHours = ctl.Config.Accounts.DeletionGraceHours
+	return p
+}
+
+func basePage(c fiber.Ctx, title string) templates.Page {
 	return templates.Page{
-		Title:  title,
-		User:   middleware.CurrentUser(c),
-		CSRF:   csrf.TokenFromContext(c),
-		Theme:  theme(c),
-		Path:   returnPath(c),
-		Query:  models.CleanQuery(c.Query("q")),
-		Scope:  searchScope(c.Query("in")),
-		Unread: middleware.UnreadDMs(c),
+		Title: title,
+		User:  middleware.CurrentUser(c),
+		CSRF:  csrf.TokenFromContext(c),
+		Theme: theme(c),
+		Path:  returnPath(c),
+		Query: models.CleanQuery(c.Query("q")),
+		Scope: searchScope(c.Query("in"), middleware.CurrentUser(c) != nil),
 	}
 }
 
@@ -73,5 +82,5 @@ func ErrorHandler(c fiber.Ctx, err error) error {
 	default:
 		log.Printf("error: %s %s: %v", c.Method(), c.Path(), err)
 	}
-	return render(c, code, templates.ErrorPage(page(c, "Error"), code, msg))
+	return render(c, code, templates.ErrorPage(basePage(c, "Error"), code, msg))
 }

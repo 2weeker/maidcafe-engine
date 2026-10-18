@@ -2,6 +2,7 @@ package controllers
 
 import (
 	"errors"
+	"time"
 
 	"github.com/gofiber/fiber/v3"
 
@@ -12,12 +13,34 @@ import (
 
 func (ctl *Controller) Settings(c fiber.Ctx) error {
 	u := middleware.CurrentUser(c)
-	return render(c, fiber.StatusOK, templates.Settings(page(c, "Settings"), *u, false))
+	return render(c, fiber.StatusOK, templates.Settings(ctl.page(c, "Settings"), *u, false))
+}
+
+func (ctl *Controller) DeleteAccount(c fiber.Ctx) error {
+	u := middleware.CurrentUser(c)
+	grace := time.Duration(ctl.Config.Accounts.DeletionGraceHours) * time.Hour
+	_, err := ctl.Store.RequestDeletion(c.Context(), u, c.FormValue("password"), grace)
+	if errors.Is(err, models.ErrWrongPassword) {
+		p := ctl.page(c, "Settings")
+		p.Error = "wrong password. your account was not scheduled for deletion."
+		return render(c, fiber.StatusUnprocessableEntity, templates.Settings(p, *u, false))
+	}
+	if err != nil {
+		return err
+	}
+	return c.Redirect().To("/settings")
+}
+
+func (ctl *Controller) CancelDeletion(c fiber.Ctx) error {
+	if err := ctl.Store.CancelDeletion(c.Context(), middleware.CurrentUser(c).ID); err != nil {
+		return err
+	}
+	return c.Redirect().To(localPath(c.FormValue("next")))
 }
 
 func (ctl *Controller) SaveSettings(c fiber.Ctx) error {
 	draft := *middleware.CurrentUser(c)
-	p := page(c, "Settings")
+	p := ctl.page(c, "Settings")
 
 	bio, err := models.CleanBio(c.FormValue("bio"))
 	if err == nil {

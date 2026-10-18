@@ -20,8 +20,9 @@ never rename one that has been applied; add a new numbered file instead.
 | `003_profile_art.sql` | `users.art` |
 | `004_board_features.sql` | Per-thread post numbers (`posts.no`, backfilled), `posts.sage`, `threads.archived_at`, `post_refs` (backfilled from existing `>>N`) |
 | `005_follows_tags_search.sql` | `follows`, `tags`, `note_tags`, `thread_tags`, full-text indexes for search |
-| `006_dms.sql` | `conversations`, `messages` |
-| `007_group_chats.sql` | Group channels (`kind`, `name`, `visibility`), `chat_members` with join/leave/invite state (replacing the per-pair read columns), system message kinds |
+| `010_moderation.sql` | `users.role/banned_at/ban_reason`, `posts.edited_at/deleted_at/removed`, `notes.edited_at`, `threads.locked_at/pinned`, `mod_actions` |
+| `009_account_deletion.sql` | `users.delete_at`; `threads.user_id` and `posts.user_id` become nullable with `ON DELETE SET NULL` so a deleted author leaves `~deleted` posts behind |
+| `008_drop_chat.sql` | Drops the chat tables (`conversations`, `chat_members`, `messages`) that migrations 006 and 007 created before the feature was removed; a no-op on fresh databases |
 
 ## Tables
 
@@ -35,6 +36,12 @@ never rename one that has been applied; add a new numbered file instead.
 | `bio` | text | ≤ 500 chars, markdown source |
 | `art` | text | ≤ 2100 chars in the DB; the app enforces 24 lines × 80 columns |
 | `created_at` | timestamptz | |
+| `delete_at` | timestamptz | null, or when a scheduled deletion takes effect |
+| `role` | text | `user`, `mod` or `admin` |
+| `banned_at`, `ban_reason` | | set while banned |
+
+Deleting a user cascades to sessions, follows, likes, reposts and notes; threads and posts keep
+their rows with `user_id` set to null and render as `~deleted` / `[deleted]`.
 
 ### `sessions`
 
@@ -57,6 +64,8 @@ never rename one that has been applied; add a new numbered file instead.
 | `reply_count` | posts minus the OP; `posts = reply_count + 1` |
 | `created_at`, `bumped_at` | the board index sorts live threads by `bumped_at` |
 | `archived_at` | null while live; set when pushed out by `max_threads` |
+| `locked_at` | set while a moderator has locked replies |
+| `pinned` | sorted to the top of the board index |
 
 ### `posts`
 
@@ -66,7 +75,14 @@ never rename one that has been applied; add a new numbered file instead.
 | `no` | position in the thread, 1 = OP; unique per thread; what `>>N` refers to |
 | `body` | 1-4000 chars, markdown source |
 | `sage` | the reply was posted without bumping |
+| `edited_at` | set when the body is edited |
+| `deleted_at`, `removed` | deleted by the author (`removed` false) or a moderator (`removed` true); the body renders as `[deleted]` / `[removed by moderator]` |
 | `created_at` | |
+
+### `mod_actions`
+
+`actor_id` (null if the mod's account is gone), `action`, `target` (a path or `~user`),
+`detail`, `created_at`. Append-only.
 
 ### `post_refs`
 
@@ -85,33 +101,6 @@ never rename one that has been applied; add a new numbered file instead.
 ### `note_likes`, `note_reposts`
 
 `(user_id, note_id)` primary key, plus `created_at`. One like and one repost per user per note.
-
-### `conversations`
-
-| Column | Notes |
-| --- | --- |
-| `kind` | `direct` or `group` |
-| `user_a`, `user_b` | direct only: the two participants, `user_a < user_b`, unique together |
-| `name`, `visibility`, `created_by` | group only: unique name, `public`/`private`, creator |
-| `last_message_at` | drives the inbox order |
-
-A check constraint enforces the shape per kind.
-
-### `chat_members`
-
-`(conversation_id, user_id)` with `state` (`joined`, `left`, `invited`), `last_read` (id of the
-last message seen), `invited_by`, `updated_at`. Direct chats always have two rows; channels one
-per person who has ever joined or been invited.
-
-### `messages`
-
-`conversation_id`, `sender_id`, `kind` (`msg`, or the system events `join`, `leave`, `invite`,
-`create`), `body` (1-2000 chars for `msg`), `target_id` (the invitee for `invite`), `created_at`.
-Indexed by `(conversation_id, id DESC)`.
-
-Sending, joining, leaving and inviting each run in one transaction that locks the member row,
-changes state, inserts the event and bumps the conversation, so counts and streams stay
-consistent. The retention sweep deletes old rows from `messages` only.
 
 ### `follows`
 

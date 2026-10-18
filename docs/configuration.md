@@ -20,10 +20,15 @@ Loading is strict. The app refuses to start, and says why, when:
 
 - a key is unknown (catches typos like `bump_limt`),
 - `tags.max_length` is outside 1-32 or `tags.max_per_post` outside 0-20,
-- any `sidebar` count or `chat.retention_hours` is negative,
-- any page size is below 1,
+- any `sidebar` count, `guests.boards`, `accounts.deletion_grace_hours` or a `cooldowns` value is
+  negative,
+- any page size or `guests.notes` is below 1,
 - `bump_limit` < 1, `post_limit` < 2, `max_threads` < 1, or `preview_replies` < 0,
 - `bump_limit` is greater than `post_limit`,
+- `captcha.length` is outside 4-10, `captcha.lifetime_seconds` outside 30-3600,
+  `captcha.lockout.failures` below 1 or `captcha.lockout.seconds` negative,
+- a `rate_limits` value is negative, or `requests` is set without `per_seconds`,
+- `about.enabled` is true and `about.title` isn't 1-40 characters,
 
 for the defaults and for every board override.
 
@@ -33,6 +38,8 @@ for the defaults and for every board override.
 server:
   listen_addr: ":8080"
   cookie_secure: false
+  proxy_header: ""
+  trusted_proxies: []
 
 database:
   url: "postgres://maidcafe:maidcafe@localhost:5432/maidcafe?sslmode=disable"
@@ -46,7 +53,6 @@ pagination:
   users: 30
   tags: 60
   search: 20
-  messages: 50
 
 tags:
   max_length: 8
@@ -57,8 +63,54 @@ sidebar:
   users: 5
   tags: 12
 
-chat:
-  retention_hours: 24
+guests:
+  notes: 10
+  boards: 1
+
+accounts:
+  deletion_grace_hours: 24
+
+captcha:
+  enabled: true
+  length: 6
+  lifetime_seconds: 300
+  honeypot: true
+  lockout:
+    failures: 3
+    seconds: 900
+
+rate_limits:
+  guests:
+    requests: 60
+    per_seconds: 60
+  users:
+    requests: 120
+    per_seconds: 60
+  auth_attempts:
+    requests: 10
+    per_seconds: 300
+  registrations:
+    requests: 3
+    per_seconds: 86400
+
+registration:
+  enabled: true
+  closed_message: "registration is closed right now. check back later."
+
+about:
+  enabled: true
+  title: "about"
+  body: |
+    Lorem ipsum dolor sit amet, ...
+
+admin:
+  usernames:
+    - testr
+
+cooldowns:
+  post_seconds: 20
+  note_seconds: 10
+  threads_per_day: 10
 
 boards:
   defaults:
@@ -82,6 +134,8 @@ boards:
 | --- | --- | --- |
 | `listen_addr` | `":8080"` | Address the HTTP server binds to |
 | `cookie_secure` | `false` | Mark session, CSRF and theme cookies `Secure`. **Set `true` when serving over HTTPS.** |
+| `proxy_header` | `""` | Header holding the real client address behind a reverse proxy, such as `X-Forwarded-For`. Empty means use the connection's address |
+| `trusted_proxies` | `[]` | Proxy addresses or CIDR ranges whose `proxy_header` is believed. Empty with a header set trusts loopback and private ranges |
 
 ### `database`
 
@@ -101,7 +155,6 @@ boards:
 | `users` | 30 | Users per page on `/users` and follower/following lists |
 | `tags` | 60 | Tags per page on `/tags` |
 | `search` | 20 | Results per page for a single search scope |
-| `messages` | 50 | Messages per page in a DM conversation (the inbox uses `users`) |
 
 ### `tags`
 
@@ -122,33 +175,81 @@ How many items the home page sidebar shows. Each panel links to the full page.
 | `users` | 5 | Newest members |
 | `tags` | 12 | Most-used tags |
 
-### `chat`
+### `guests`
+
+What a visitor who isn't logged in sees on the home page. See
+[features/accounts.md](features/accounts.md#logged-out-visitors) for everything else guests
+can and can't reach.
 
 | Key | Default | Meaning |
 | --- | --- | --- |
-| `retention_hours` | 24 | Delete chat messages (DMs and channels, including join/leave lines) older than this. `0` keeps them forever. A sweep runs every minute |
+| `notes` | 10 | Notes on the home feed (`recent` or `top`), with no older pages; a login prompt stands in for the pager when more exist |
+| `boards` | 1 | Boards in the sidebar; a login prompt replaces `more boards >>` when more exist |
 
-### `boards.defaults`
+The users and tags panels aren't shown to guests at all, and that isn't configurable.
 
-Rules for every board unless overridden.
+### `accounts`
 
 | Key | Default | Meaning |
 | --- | --- | --- |
-| `bump_limit` | 300 | Once a thread has this many posts, replies stop moving it to the top of the board |
-| `post_limit` | 1000 | Once a thread has this many posts it is **full**: the reply box is replaced by a notice |
-| `max_threads` | 150 | Live threads per board. Creating a thread beyond this archives the least-recently-bumped ones |
-| `preview_replies` | 5 | Latest replies shown under each OP on the board index (0 = OP only) |
+| `deletion_grace_hours` | 24 | How long a scheduled account deletion can be cancelled before the sweep removes the account. `0` deletes on the next sweep (within a minute) |
 
-"Posts" always includes the opening post: a thread with an OP and 9 replies has 10 posts.
+### `admin`
 
-### `boards.overrides`
+| Key | Default | Meaning |
+| --- | --- | --- |
+| `usernames` | `[]` | Accounts that are admins. Applied on every start: listed accounts become admin, unlisted admins are demoted. See [moderation.md](features/moderation.md) |
 
-A map from board slug to any subset of the keys above. Unlisted keys fall back to
-`boards.defaults`. Slugs that don't match a board are harmless (and ignored).
+### `cooldowns`
 
-The shipped `config.yaml` gives `/random/` deliberately tight limits so the lifecycle
-features are easy to see (see [showcase.md](showcase.md)). Remove or relax that override for
-normal use.
+| Key | Default | Meaning |
+| --- | --- | --- |
+| `post_seconds` | 20 | Minimum seconds between one user's board posts |
+| `note_seconds` | 10 | Minimum seconds between one user's notes |
+| `threads_per_day` | 10 | Threads one user may start per rolling 24 hours |
+
+`0` disables a limit.
+
+### `captcha`
+
+Applies to the login and registration forms, for logged-out visitors only. See
+[captcha-and-rate-limits.md](features/captcha-and-rate-limits.md).
+
+| Key | Default | Meaning |
+| --- | --- | --- |
+| `enabled` | `true` | Show and check the image captcha |
+| `length` | 6 | Characters per captcha (4-10) |
+| `lifetime_seconds` | 300 | How long a captcha stays answerable (30-3600) |
+| `honeypot` | `true` | Add the hidden `website` field and refuse forms that fill it. Independent of `enabled` |
+| `lockout.failures` | 3 | Wrong answers from one address on one form before it's locked |
+| `lockout.seconds` | 900 | How long the lockout lasts. `0` never locks |
+
+### `rate_limits`
+
+Each limit is `requests` allowed at once, refilling evenly over `per_seconds`. `requests: 0`
+turns it off.
+
+| Key | Default | Counts |
+| --- | --- | --- |
+| `guests` | 60 / 60s | Requests from a logged-out visitor, per address |
+| `users` | 120 / 60s | Requests from a logged-in user, per account |
+| `auth_attempts` | 10 / 300s | Login and register submissions, per address |
+| `registrations` | 3 / 86400s | Accounts created, per address |
+
+### `registration`
+
+| Key | Default | Meaning |
+| --- | --- | --- |
+| `enabled` | `true` | `false` closes sign-ups: the register links disappear and `/register` shows `closed_message` |
+| `closed_message` | *registration is closed right now. check back later.* | Shown on `/register` while closed |
+
+### `about`
+
+| Key | Default | Meaning |
+| --- | --- | --- |
+| `enabled` | `true` | Serve `/about` and link it from the footer |
+| `title` | `about` | Heading, tab title and footer link label (1-40 characters) |
+| `body` | lorem ipsum | The page text, in the site's [formatting](features/formatting.md) |
 
 ## Environment variables
 
@@ -174,7 +275,7 @@ Compose-level variables (read from your shell or a `.env` file):
 ## What isn't configurable yet
 
 - The list of boards (slug, name, description, order) lives in the database, seeded by the first
-  migration. Add or rename boards with SQL for now.
+  migration and managed from the admin panel (`/admin/boards`).
 - Text limits (note 300 chars, post 4000, title 120, bio 500, art 24×80) are constants in the
   models.
 - Themes are a fixed list in `web/templates/page.go`.

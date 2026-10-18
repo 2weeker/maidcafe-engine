@@ -3,21 +3,25 @@
 The bar under the masthead on every page is a plain GET form: `/search?q=…&in=…`. No JavaScript.
 
 ```
-[search://][ q                       ][ all ▾ ][ go >> ]
+[search://][ q                       ][ * all ▾ ][ go >> ]
 ```
 
 ## Scopes
 
-| `in=` | Searches | Results |
-| --- | --- | --- |
-| `all` (default) | everything below | up to 5 of each kind, each group with a `[more …]` link |
-| `notes` | note bodies | note cards, paginated |
-| `threads` | post bodies and thread titles | matching threads (first page), then matching posts linking to `#N` in their thread |
-| `users` | usernames and bios | user cards |
-| `tags` | tag names | tag chips with use counts |
+| `in=` | Dropdown shows | Searches | Results |
+| --- | --- | --- | --- |
+| `all` (default) | `* all` | everything below | up to 5 of each kind, each group with a `[more …]` link |
+| `notes` | `✎ notes` | note bodies | note cards, paginated |
+| `threads` | `>> threads` | post bodies and thread titles | matching threads (first page), then matching posts linking to `#N` in their thread |
+| `users` | `~ users` | usernames and bios | user cards |
+| `tags` | `# tags` | tag names | tag chips with use counts |
 
 Paginated scopes use `pagination.search` (default 20). A page past the last result is a 404,
 like every other list.
+
+Logged-out visitors get only `all`, `notes` and `threads`; `in=users` or `in=tags` falls back to
+`all`, and `all` leaves out users and tags for them. `#tag` still jumps to the tag page, which
+then asks them to log in.
 
 ## Shortcuts
 

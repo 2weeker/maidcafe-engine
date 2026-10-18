@@ -1,11 +1,28 @@
 package templates
 
-import (
-	"strconv"
-	"time"
+import "maidcafe-engine/app/models"
 
-	"maidcafe-engine/app/models"
-)
+const HoneypotField = "website"
+
+type SiteSettings struct {
+	RegistrationOpen bool
+	About            bool
+	AboutTitle       string
+}
+
+var Site = SiteSettings{RegistrationOpen: true}
+
+type CaptchaView struct {
+	ID            string
+	Width, Height int
+}
+
+type AuthForm struct {
+	Username string
+	Honeypot bool
+	Captcha  *CaptchaView
+	Locked   string
+}
 
 type HomeView struct {
 	Boards     []models.Board
@@ -58,60 +75,11 @@ type TagView struct {
 	PostsPerPage int
 }
 
-type ChannelDraft struct {
-	Name       string
-	Visibility string
+type AdminUsersView struct {
+	Users []models.AdminUser
+	Query string
+	Pager models.Pager
 }
-
-type InboxView struct {
-	Conversations []models.Conversation
-	Invites       []models.Invite
-	Pager         models.Pager
-	Draft         ChannelDraft
-	Retention     int
-}
-
-type ChannelsView struct {
-	Groups []models.Group
-	Pager  models.Pager
-}
-
-type ChatView struct {
-	Title     string
-	Base      string
-	Group     *models.Group
-	Other     *models.User
-	Members   []string
-	Member    bool
-	CanJoin   bool
-	Invited   bool
-	Left      bool
-	CanLeave  bool
-	Messages  []models.Message
-	Pager     models.Pager
-	Draft     string
-	Retention int
-}
-
-func ChannelURL(name string) string { return "/dm/c/" + name }
-
-func convURL(c models.Conversation) string {
-	if c.IsGroup() {
-		return ChannelURL(c.Name)
-	}
-	return DMURL(c.Other)
-}
-
-func lastMessageID(msgs []models.Message) string {
-	if len(msgs) == 0 {
-		return "0"
-	}
-	return strconv.FormatInt(msgs[len(msgs)-1].ID, 10)
-}
-
-func msgID(id int64) string    { return "m" + strconv.FormatInt(id, 10) }
-func day(t time.Time) string   { return t.UTC().Format("2006-01-02") }
-func clock(t time.Time) string { return t.UTC().Format("15:04") }
 
 type SearchView struct {
 	Query        string
@@ -124,6 +92,27 @@ type SearchView struct {
 	Tags         []models.Tag
 	Pager        models.Pager
 	PostsPerPage int
+}
+
+func SearchScopes(loggedIn bool) []string {
+	if loggedIn {
+		return []string{"all", "notes", "threads", "users", "tags"}
+	}
+	return []string{"all", "notes", "threads"}
+}
+
+func scopeLabel(scope string) string {
+	switch scope {
+	case "notes":
+		return "✎ notes"
+	case "threads":
+		return ">> threads"
+	case "users":
+		return "~ users"
+	case "tags":
+		return "# tags"
+	}
+	return "* all"
 }
 
 func (v SearchView) Empty() bool {

@@ -55,6 +55,13 @@ reply is sage or the thread is past its bump limit.
 Every post has a `[>>]` button. It opens the thread's last page with `>>N` already in the reply
 box: the no-JS version of 2ch's click-the-number-to-quote. (`/t/:id?quote=N`.)
 
+### Editing and deleting
+
+Your own posts have `[edit]` and `[delete]` in their header. Edits get an `(edited)` marker.
+Deleting leaves `[deleted]` in place so numbering and references survive. Moderators see the same
+tools on every post (`[remove]` / `[restore]`) plus `[lock]`, `[pin]` and `[delete thread]` on the
+thread; see [moderation.md](moderation.md).
+
 ### Sage
 
 The reply form has a **sage (don't bump)** checkbox. A sage reply is posted normally but leaves
@@ -70,6 +77,9 @@ All three limits are per board, set in [`config.yaml`](../configuration.md).
 | `post_limit` | 1000 posts | The thread is **full**: tagged `full`, and the reply box is replaced by *"this thread has reached N posts. start a new one on /board/."* |
 | `max_threads` | 150 | Creating a thread beyond this archives the least-recently-bumped live threads |
 
+Moderators can also **lock** a thread (no replies, tagged `locked`) and **pin** it (sorted first).
+Posting is rate-limited by the `cooldowns` settings ([moderation.md](moderation.md#cooldowns)).
+
 If a reply is refused because the thread filled up (or was archived) while you were typing, the
 page shows your text in a read-only box so you can copy it.
 
@@ -81,8 +91,8 @@ with no reply box.
 
 ## Formatting
 
-Board posts use the same markdown subset as notes ([formatting.md](formatting.md)), plus `>>N`
-references and `[aa]` Shift-JIS art blocks.
+Board posts use the same markdown subset as notes ([formatting.md](formatting.md)), including
+`>greentext` and `[spoiler]` tags, plus `>>N` references and `[aa]` Shift-JIS art blocks.
 
 ## Limits
 

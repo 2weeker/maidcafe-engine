@@ -21,7 +21,7 @@ func (ctl *Controller) Users(c fiber.Ctx) error {
 		return err
 	}
 	users = models.Trim(&pg, users)
-	return render(c, fiber.StatusOK, templates.UsersPage(page(c, "Users"), templates.UsersView{Users: users, Sort: sort, Pager: pg}))
+	return render(c, fiber.StatusOK, templates.UsersPage(ctl.page(c, "Users"), templates.UsersView{Users: users, Sort: sort, Pager: pg}))
 }
 
 func (ctl *Controller) Followers(c fiber.Ctx) error {
@@ -51,7 +51,7 @@ func (ctl *Controller) followList(c fiber.Ctx, kind string) error {
 		return err
 	}
 	users = models.Trim(&pg, users)
-	return render(c, fiber.StatusOK, templates.FollowListPage(page(c, "~"+u.Username+" "+kind),
+	return render(c, fiber.StatusOK, templates.FollowListPage(ctl.page(c, "~"+u.Username+" "+kind),
 		templates.FollowListView{User: *u, Kind: kind, Users: users, Pager: pg}))
 }
 

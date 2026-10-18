@@ -30,7 +30,7 @@ type ThreadView struct {
 }
 
 func (v ThreadView) Locked() bool {
-	return v.Thread.ArchivedAt != nil || threadFull(*v.Thread, v.Rules)
+	return v.Thread.ArchivedAt != nil || v.Thread.LockedAt != nil || threadFull(*v.Thread, v.Rules)
 }
 
 type ArchiveView struct {

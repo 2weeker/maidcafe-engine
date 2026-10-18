@@ -7,23 +7,24 @@ templ Home(p Page, v HomeView) {
 		<div class="cols">
 			<section class="col-main">
 				@sectionHead("notes")
-				if !v.Pager.HasPrev() {
-					if p.User != nil {
-						<form method="post" action="/notes" class="box compose">
-							@csrfField(p)
-							<label for="note-body">what's on your mind, ~{ p.User.Username }?</label>
-							<textarea id="note-body" name="body" rows="3" maxlength="300" required>{ v.Draft }</textarea>
-							@formatHint()
-							<div class="row-between">
-								@tagPicker(v.Picker)
-								<button type="submit">post note</button>
-							</div>
-						</form>
-					} else {
-						@loginPrompt("post notes")
-					}
+				if p.User != nil {
+					<form method="post" action="/notes" class="box compose">
+						@csrfField(p)
+						<label for="note-body">what's on your mind, ~{ p.User.Username }?</label>
+						<textarea id="note-body" name="body" rows="3" maxlength="300" required>{ v.Draft }</textarea>
+						@formatHint()
+						<div class="row-between">
+							@tagPicker(v.Picker)
+							<button type="submit">post note</button>
+						</div>
+					</form>
+				} else {
+					@loginPrompt("post notes")
 				}
-				@sortTabs("/", v.Sort, p.User != nil)
+				<div class="tabs-row">
+					@sortTabs("/", v.Sort, p.User != nil)
+					@jumpDown()
+				</div>
 				if v.Sort == models.SortFollowing && p.User == nil {
 					@loginPrompt("see notes from people you follow")
 				} else {
@@ -35,10 +36,17 @@ templ Home(p Page, v HomeView) {
 					} else {
 						@noteList(p, v.Items, "-- nothing yet. --")
 					}
-					@notePager(v.Pager, "/", v.Sort)
+					if p.User == nil {
+						if v.Pager.HasNext {
+							@loginPrompt("read older notes")
+						}
+					} else {
+						@notePager(v.Pager, "/", v.Sort)
+					}
 				}
+				@jumpUp()
 			</section>
-			@sidebar(v.Boards, v.MoreBoards, v.Users, v.Tags)
+			@sidebar(p, v.Boards, v.MoreBoards, v.Users, v.Tags)
 		</div>
 	}
 }

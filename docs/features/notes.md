@@ -6,7 +6,8 @@ home page and on profiles; boards and threads are a separate world ([boards.md](
 ## Posting
 
 The box at the top of the home page (`what's on your mind, ~you?`). Notes support the
-[formatting](formatting.md) subset: bold, italic, strike, code, links, lists, `> quotes`.
+[formatting](formatting.md) subset: bold, italic, strike, code, links, lists, `> quotes`,
+`>greentext` and `[spoiler]` tags.
 `>>N` stays literal in notes (there's no thread for it to point into), but `>>>/board/` links work.
 
 ## Every note's action bar
@@ -14,15 +15,17 @@ The box at the top of the home page (`what's on your mind, ~you?`). Notes suppor
 ```
 ~author  re: ~parent                        2026-10-16 07:09   <- timestamp links to the note's page
 note body
-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-[ reply 3 ]  [ repost 1 ]  [ liked 5 ]
+[ ↳ 3 ]  [ ↰ 1 ]  [ <3 5 ]
 ```
 
 | Button | Does |
 | --- | --- |
-| `reply N` | Opens the note's page at the reply box |
-| `repost N` / `reposted N` | Repost or undo. Solid black means you've reposted |
-| `like N` / `liked N` | Like or undo. Solid black means you've liked |
+| `↳ N` | Reply: opens the note's page at the reply box |
+| `↰ N` | Repost or undo. Solid black means you've reposted |
+| `<3 N` | Like or undo. Solid black means you've liked |
+
+Each button carries its word as a tooltip (`reply`, `repost`, `like`, or `unrepost` / `unlike`
+when it's active) and as an accessible label, so screen readers hear "like, 5", not the symbol.
 
 Logged out, the buttons are links to `/login`.
 
@@ -30,6 +33,13 @@ Logged out, the buttons are links to `/login`.
 (`on=1` or `on=0`) instead of "toggle", so resubmitting a form (back button, double click) can
 never flip it the wrong way. After the click you land back on the same page, sort and position
 (the form carries `next=/current/path#this-note`).
+
+## Editing and deleting
+
+Your own notes have `[edit]` and `[delete]` in the action bar. Edits show `(edited)`; deleting
+removes the note and the replies under it, after a confirmation page. Moderators see
+`[remove]` on everyone's notes ([moderation.md](moderation.md)). Posting notes is rate-limited by
+`cooldowns.note_seconds`.
 
 ## Replies
 
@@ -42,12 +52,16 @@ never flip it the wrong way. After the click you land back on the same page, sor
 
 ## Reposts
 
-Reposting puts the note back at the top of the **recent** home feed with a context line:
+Reposting puts the note back at the top of the **recent** home feed. The reposter's line sits
+on top and the original note is drawn nested inside its own bordered, slightly indented box:
 
 ```
-~bob reposted
-~alice                                      2026-10-16 07:09
-the original note
+↰ ~bob reposted
+  ┌───────────────────────────────────────────────┐
+  │ ~alice                       2026-10-16 07:09 │
+  │ the original note                             │
+  │ [ ↳ 0 ]  [ ↰ 1 ]  [ <3 2 ]                    │
+  └───────────────────────────────────────────────┘
 ```
 
 It also appears on the reposter's profile. One repost per person per note; the note shows the
@@ -71,11 +85,17 @@ Tabs on the home page and every profile:
 
 `top` is all-time for now. See [users-and-following.md](users-and-following.md) for following.
 
+## Logged-out visitors
+
+Guests see only the first `guests.notes` notes of the home feed (default 10, `recent` or `top`),
+and a *log in or register to read older notes* box instead of the pager. Note pages and
+profiles are fully readable. See [accounts.md](accounts.md#logged-out-visitors).
+
 ## Pagination
 
 30 notes per page (configurable: `pagination.notes`). Pages are `?page=N` links:
 `<< newer | [ page 2 ] | older >>` (`prev`/`next` under `top`). The sort carries through
-(`/?sort=top&page=2`). The composer only shows on page 1. A page past the end is a 404.
+(`/?sort=top&page=2`). The composer shows on every page. A page past the end is a 404.
 
 ## Limits
 

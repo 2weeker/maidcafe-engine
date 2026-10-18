@@ -1,0 +1,211 @@
+package templates
+
+import "maidcafe-engine/app/models"
+
+templ adminNav(p Page, current string) {
+	<nav class="tabs" aria-label="admin">
+		for _, t := range [][2]string{{"dashboard", "/admin"}, {"users", "/admin/users"}, {"boards", "/admin/boards"}, {"log", "/admin/log"}, {"config", "/admin/config"}} {
+			if (t[0] == "boards" || t[0] == "config") && !p.User.IsAdmin() {
+			} else if t[0] == current {
+				<span class="tab on" aria-current="page">{ t[0] }</span>
+			} else {
+				<a class="tab" href={ templ.URL(t[1]) }>{ t[0] }</a>
+			}
+		}
+	</nav>
+}
+
+templ AdminHome(p Page, st models.AdminStats, log []models.ModAction) {
+	@Layout(p) {
+		<h1 class="huge">admin <span class="thin">{ p.User.Role }</span></h1>
+		@adminNav(p, "dashboard")
+		<div class="stat-grid">
+			@stat("users", st.Users, "/admin/users")
+			@stat("mods + admins", st.Mods, "/admin/users")
+			@stat("banned", st.Banned, "/admin/users")
+			@stat("pending deletion", st.PendingDeletion, "/admin/users")
+			@stat("notes", st.Notes, "/")
+			@stat("threads", st.Threads, "/boards")
+			@stat("posts", st.Posts, "/boards")
+			@stat("tags", st.Tags, "/tags")
+		</div>
+		@sectionHead("recent actions")
+		@logTable(log)
+		<p class="more"><a href="/admin/log">[full log]</a></p>
+	}
+}
+
+templ stat(label string, n int, href string) {
+	<a href={ templ.URL(href) } class="box stat">
+		<span class="stat-n">{ itoa(n) }</span>
+		<span class="stat-l">{ label }</span>
+	</a>
+}
+
+templ logTable(log []models.ModAction) {
+	if len(log) == 0 {
+		<p class="muted">-- nothing yet. --</p>
+	} else {
+		<table class="box threads">
+			<thead><tr><th>when</th><th>who</th><th>action</th><th>target</th><th>detail</th></tr></thead>
+			<tbody>
+				for _, a := range log {
+					<tr>
+						<td><time>{ stamp(a.CreatedAt) }</time></td>
+						<td>~{ a.Actor }</td>
+						<td><b>{ a.Action }</b></td>
+						<td>
+							if len(a.Target) > 0 && a.Target[0] == '/' {
+								<a href={ templ.URL(a.Target) }>{ a.Target }</a>
+							} else if len(a.Target) > 0 && a.Target[0] == '~' {
+								<a href={ templ.URL(userURL(a.Target[1:])) }>{ a.Target }</a>
+							} else {
+								{ a.Target }
+							}
+						</td>
+						<td class="muted">{ a.Detail }</td>
+					</tr>
+				}
+			</tbody>
+		</table>
+	}
+}
+
+templ AdminLog(p Page, log []models.ModAction, pg models.Pager) {
+	@Layout(p) {
+		<h1 class="huge">mod log</h1>
+		@adminNav(p, "log")
+		@logTable(log)
+		@pagerNav(pg, "/admin/log", "newer", "older")
+	}
+}
+
+templ AdminUsers(p Page, v AdminUsersView) {
+	@Layout(p) {
+		<h1 class="huge">users</h1>
+		@adminNav(p, "users")
+		<form method="get" action="/admin/users" class="box compose admin-search">
+			<label for="admin-q">find</label>
+			<div class="row-between">
+				<input id="admin-q" type="text" name="q" value={ v.Query } placeholder="username" autocomplete="off"/>
+				<button type="submit">search</button>
+			</div>
+		</form>
+		if len(v.Users) == 0 {
+			<p class="muted">-- nobody matches. --</p>
+		} else {
+			<table class="box threads admin-users">
+				<thead><tr><th>user</th><th>role</th><th>activity</th><th>status</th><th>actions</th></tr></thead>
+				<tbody>
+					for _, u := range v.Users {
+						<tr>
+							<td><a href={ templ.URL(userURL(u.Username)) } class="author">~{ u.Username }</a><br/><span class="muted small">joined { stamp(u.CreatedAt) }</span></td>
+							<td>
+								if u.Role == models.RoleAdmin {
+									<span class="tag">admin</span>
+								} else if p.User.IsAdmin() {
+									<form method="post" action={ templ.URL(userURL(u.Username) + "/role") } class="inline">
+										@csrfField(p)
+										<input type="hidden" name="q" value={ v.Query }/>
+										if u.Role == models.RoleMod {
+											<input type="hidden" name="role" value="user"/>
+											<button type="submit" class="act on" title="demote to user">mod</button>
+										} else {
+											<input type="hidden" name="role" value="mod"/>
+											<button type="submit" class="act" title="make moderator">user</button>
+										}
+									</form>
+								} else {
+									<span class="tag">{ u.Role }</span>
+								}
+							</td>
+							<td class="small">{ plural(u.Notes, "note") }, { plural(u.Posts, "post") }</td>
+							<td class="small">
+								if u.BannedAt != nil {
+									<span class="tag">banned</span> <span class="muted">{ u.BanReason }</span>
+								}
+								if u.DeleteAt != nil {
+									<span class="tag">deleting { stamp(*u.DeleteAt) }</span>
+								}
+							</td>
+							<td>
+								if u.Role != models.RoleAdmin && u.ID != p.User.ID && (u.Role != models.RoleMod || p.User.IsAdmin()) {
+									if u.BannedAt != nil {
+										<form method="post" action={ templ.URL(userURL(u.Username) + "/unban") } class="inline">
+											@csrfField(p)
+											<input type="hidden" name="next" value={ "/admin/users?q=" + urlQuery(v.Query) }/>
+											<button type="submit" class="act">unban</button>
+										</form>
+									} else {
+										<form method="post" action={ templ.URL(userURL(u.Username) + "/ban") } class="ban-form">
+											@csrfField(p)
+											<input type="hidden" name="next" value={ "/admin/users?q=" + urlQuery(v.Query) }/>
+											<input type="text" name="reason" placeholder="reason" maxlength="200"/>
+											<button type="submit" class="act">ban</button>
+										</form>
+									}
+								}
+							</td>
+						</tr>
+					}
+				</tbody>
+			</table>
+			if v.Query == "" {
+				@pagerNav(v.Pager, "/admin/users", "prev", "next")
+			} else {
+				@pagerNav(v.Pager, "/admin/users?q="+urlQuery(v.Query), "prev", "next")
+			}
+		}
+	}
+}
+
+templ AdminBoards(p Page, boards []models.Board) {
+	@Layout(p) {
+		<h1 class="huge">boards</h1>
+		@adminNav(p, "boards")
+		<table class="box threads admin-boards">
+			<thead><tr><th>slug</th><th>name</th><th>description</th><th>pos</th><th>threads</th><th></th></tr></thead>
+			<tbody>
+				for _, b := range boards {
+					<tr>
+						<form method="post" action={ templ.URL("/admin/boards/" + b.Slug) }>
+							@csrfField(p)
+							<td><a href={ templ.URL(boardURL(b.Slug)) } class="board-slug">/{ b.Slug }/</a></td>
+							<td><input type="text" name="name" value={ b.Name } maxlength="40" required/></td>
+							<td><input type="text" name="description" value={ b.Description } maxlength="200"/></td>
+							<td><input type="text" name="position" value={ itoa(b.Position) } size="3"/></td>
+							<td class="num">{ itoa(b.ThreadCount + b.Archived) }</td>
+							<td class="row-actions">
+								<button type="submit" class="act">save</button>
+								if b.ThreadCount+b.Archived == 0 {
+									<button type="submit" name="action" value="delete" class="act" title="delete this empty board">delete</button>
+								}
+							</td>
+						</form>
+					</tr>
+				}
+			</tbody>
+		</table>
+		@sectionHead("new board")
+		<form method="post" action="/admin/boards" class="box compose">
+			@csrfField(p)
+			<div class="board-form">
+				<label>slug <input type="text" name="slug" maxlength="16" pattern="[a-z0-9]{1,16}" required placeholder="tech"/></label>
+				<label>name <input type="text" name="name" maxlength="40" required placeholder="Tech"/></label>
+				<label>description <input type="text" name="description" maxlength="200" placeholder="Computers, code, hardware."/></label>
+				<label>position <input type="text" name="position" value={ itoa(len(boards)) } size="3"/></label>
+			</div>
+			<p class="hint">slug: 1-16 chars, a-z 0-9. boards are listed by position, then slug. per-board limits live in config.yaml under boards.overrides.</p>
+			<div class="row-end"><button type="submit">create board</button></div>
+		</form>
+	}
+}
+
+templ AdminConfig(p Page, yaml string) {
+	@Layout(p) {
+		<h1 class="huge">config</h1>
+		@adminNav(p, "config")
+		<p class="muted">the configuration the running app loaded (database password hidden). edit <code>config.yaml</code> and <code>make restart</code> to change it.</p>
+		<pre class="box config-dump">{ yaml }</pre>
+	}
+}

@@ -8,32 +8,43 @@ import (
 )
 
 func (ctl *Controller) Home(c fiber.Ctx) error {
-	return ctl.renderHome(c, fiber.StatusOK, page(c, "Home"), "", nil)
+	return ctl.renderHome(c, fiber.StatusOK, ctl.page(c, "Home"), "", nil)
 }
 
 func (ctl *Controller) renderHome(c fiber.Ctx, status int, p templates.Page, draft string, selected []string) error {
 	ctx := c.Context()
+	viewer := viewerID(c)
+	guest := viewer == 0
 	boards, err := ctl.Store.Boards(ctx)
 	if err != nil {
 		return err
 	}
-	users, err := ctl.Store.NewestUsers(ctx, ctl.Config.Sidebar.Users)
-	if err != nil {
-		return err
+	boardLimit := ctl.Config.Sidebar.Boards
+	var (
+		users  []models.UserCard
+		tags   []models.Tag
+		picker templates.TagPicker
+		pg     models.Pager
+	)
+	if guest {
+		boardLimit = ctl.Config.Guests.Boards
+		pg = models.NewPager(1, ctl.Config.Guests.Notes)
+	} else {
+		if users, err = ctl.Store.NewestUsers(ctx, ctl.Config.Sidebar.Users); err != nil {
+			return err
+		}
+		if tags, err = ctl.Store.PopularTags(ctx, ctl.Config.Sidebar.Tags); err != nil {
+			return err
+		}
+		if picker, err = ctl.tagPicker(c, selected); err != nil {
+			return err
+		}
+		pg = pager(c, ctl.Config.Pagination.Notes)
 	}
-	tags, err := ctl.Store.PopularTags(ctx, ctl.Config.Sidebar.Tags)
-	if err != nil {
-		return err
-	}
-	moreBoards := len(boards) > ctl.Config.Sidebar.Boards
-	boards = boards[:min(len(boards), ctl.Config.Sidebar.Boards)]
-	picker, err := ctl.tagPicker(c, selected)
-	if err != nil {
-		return err
-	}
+	moreBoards := len(boards) > boardLimit
+	boards = boards[:min(len(boards), boardLimit)]
 	sort := models.ParseSort(c.Query("sort"))
-	pg := pager(c, ctl.Config.Pagination.Notes)
-	items, err := ctl.Store.Feed(ctx, viewerID(c), sort, pg.Limit(), pg.Offset())
+	items, err := ctl.Store.Feed(ctx, viewer, sort, pg.Limit(), pg.Offset())
 	if err != nil {
 		return err
 	}
@@ -67,7 +78,7 @@ func (ctl *Controller) BoardsPage(c fiber.Ctx) error {
 	if err != nil {
 		return err
 	}
-	return render(c, fiber.StatusOK, templates.BoardsPage(page(c, "Boards"), boards))
+	return render(c, fiber.StatusOK, templates.BoardsPage(ctl.page(c, "Boards"), boards))
 }
 
 func (ctl *Controller) Profile(c fiber.Ctx) error {
@@ -92,7 +103,7 @@ func (ctl *Controller) Profile(c fiber.Ctx) error {
 		return err
 	}
 	items = models.Trim(&pg, items)
-	return render(c, fiber.StatusOK, templates.Profile(page(c, "~"+u.Username), templates.ProfileView{
+	return render(c, fiber.StatusOK, templates.Profile(ctl.page(c, "~"+u.Username), templates.ProfileView{
 		User:  *u,
 		Card:  *card,
 		Items: items,

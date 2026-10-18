@@ -1,6 +1,8 @@
 package templates
 
 import (
+	"fmt"
+
 	"maidcafe-engine/app/config"
 	"maidcafe-engine/app/models"
 	"maidcafe-engine/web/markup"
@@ -16,6 +18,7 @@ templ BoardPage(p Page, v BoardIndex) {
 				<a href={ templ.URL(boardURL(v.Board.Slug) + "/archive") }>[archive]</a>
 			</p>
 		</section>
+		@jumpDown()
 		if p.User != nil {
 			<details class="box new-thread" open?={ p.Error != "" }>
 				<summary>[ start a new thread ]</summary>
@@ -40,10 +43,11 @@ templ BoardPage(p Page, v BoardIndex) {
 		} else {
 			@subjectList(v)
 			for _, tp := range v.Threads {
-				@threadPreview(tp, v)
+				@threadPreview(p, tp, v)
 			}
 			@pagerNav(v.Pager, boardURL(v.Board.Slug), "newer", "older")
 		}
+		@jumpUp()
 	}
 }
 
@@ -60,7 +64,7 @@ templ subjectList(v BoardIndex) {
 	</nav>
 }
 
-templ threadPreview(tp models.ThreadPreview, v BoardIndex) {
+templ threadPreview(p Page, tp models.ThreadPreview, v BoardIndex) {
 	<section class="thread-preview" id={ threadAnchor(tp.ID) }>
 		<h2 class="preview-title">
 			<a href={ templ.URL(threadURL(tp.ID)) }>{ tp.Title }</a>
@@ -68,7 +72,7 @@ templ threadPreview(tp models.ThreadPreview, v BoardIndex) {
 			@tagChips(tp.Tags)
 		</h2>
 		for i, post := range tp.Shown {
-			@postItem(tp.Thread, post, nil, v.PostsPerPage)
+			@postItem(p, tp.Thread, post, nil, v.PostsPerPage)
 			if i == 0 && tp.Omitted > 0 {
 				<p class="omitted">
 					{ plural(tp.Omitted, "reply") } omitted.
@@ -80,6 +84,12 @@ templ threadPreview(tp models.ThreadPreview, v BoardIndex) {
 }
 
 templ threadStatus(t models.Thread, r config.BoardRules) {
+	if t.Pinned {
+		<span class="tag">pinned</span>
+	}
+	if t.LockedAt != nil {
+		<span class="tag">locked</span>
+	}
 	if t.ArchivedAt != nil {
 		<span class="tag">archived</span>
 	} else if threadFull(t, r) {
@@ -89,8 +99,8 @@ templ threadStatus(t models.Thread, r config.BoardRules) {
 	}
 }
 
-templ postItem(t models.Thread, post models.Post, backlinks []int, perPage int) {
-	<article class="box post" id={ postAnchor(post.No) }>
+templ postItem(p Page, t models.Thread, post models.Post, backlinks []int, perPage int) {
+	<article class={ "box", "post", templ.KV("gone", post.DeletedAt != nil) } id={ postAnchor(post.No) }>
 		<header class="meta">
 			<a href={ templ.URL(threadPostURL(t.ID, post.No, perPage)) } class="post-no">#{ itoa(post.No) }</a>
 			<a href={ templ.URL(userURL(post.Author)) } class="author">~{ post.Author }</a>
@@ -100,10 +110,14 @@ templ postItem(t models.Thread, post models.Post, backlinks []int, perPage int) 
 			if post.Sage {
 				<span class="tag sage">sage</span>
 			}
+			if post.EditedAt != nil && post.DeletedAt == nil {
+				<span class="muted" title={ "edited " + stamp(*post.EditedAt) }>(edited)</span>
+			}
 			<time>{ stamp(post.CreatedAt) }</time>
-			if t.ArchivedAt == nil {
+			if t.ArchivedAt == nil && t.LockedAt == nil && post.DeletedAt == nil {
 				<a href={ templ.URL(quoteURL(t, post.No, perPage)) } class="quote-link" title="reply to this post">[&gt;&gt;]</a>
 			}
+			@postTools(p, t, post)
 		</header>
 		<div class="body">
 			@templ.Raw(markup.RenderPost(post.Body, refResolver(t, perPage)))
@@ -127,16 +141,20 @@ templ ThreadPage(p Page, v ThreadView) {
 			{ plural(v.Thread.Posts(), "post") }
 			@threadStatus(*v.Thread, v.Rules)
 			@tagChips(v.Thread.Tags)
+			@threadModTools(p, *v.Thread)
 		</p>
+		@jumpDown()
 		@pagerNav(v.Pager, threadURL(v.Thread.ID), "prev", "next")
 		for _, post := range v.Posts {
-			@postItem(*v.Thread, post, v.Backlinks[post.No], v.PostsPerPage)
+			@postItem(p, *v.Thread, post, v.Backlinks[post.No], v.PostsPerPage)
 		}
 		@pagerNav(v.Pager, threadURL(v.Thread.ID), "prev", "next")
 		@sectionHead("reply")
 		<div id="reply">
 			if v.Thread.ArchivedAt != nil {
 				<p class="box notice">this thread is archived. it can be read but not replied to.</p>
+			} else if v.Thread.LockedAt != nil {
+				<p class="box notice">this thread is locked by a moderator.</p>
 			} else if threadFull(*v.Thread, v.Rules) {
 				<p class="box notice">this thread has reached { itoa(v.Rules.PostLimit) } posts. <a href={ templ.URL(boardURL(v.Thread.BoardSlug)) }>start a new one on /{ v.Thread.BoardSlug }/</a>.</p>
 			}
@@ -165,6 +183,7 @@ templ ThreadPage(p Page, v ThreadView) {
 				@loginPrompt("reply")
 			}
 		</div>
+		@jumpUp()
 	}
 }
 
@@ -172,6 +191,7 @@ templ ArchivePage(p Page, v ArchiveView) {
 	@Layout(p) {
 		<p class="crumbs"><a href={ templ.URL(boardURL(v.Board.Slug)) }>&lt;&lt; /{ v.Board.Slug }/</a></p>
 		<h1 class="huge">/{ v.Board.Slug }/ <span class="thin">archive</span></h1>
+		@jumpDown()
 		if len(v.Threads) == 0 {
 			<p class="muted">-- nothing archived yet. --</p>
 		} else {
@@ -192,5 +212,52 @@ templ ArchivePage(p Page, v ArchiveView) {
 			</table>
 			@pagerNav(v.Pager, boardURL(v.Board.Slug)+"/archive", "newer", "older")
 		}
+		@jumpUp()
+	}
+}
+
+templ postTools(p Page, t models.Thread, post models.Post) {
+	if p.User != nil && post.DeletedAt == nil && t.ArchivedAt == nil && (post.AuthorID == p.User.ID || p.User.IsMod()) {
+		<span class="tools">
+			<a href={ templ.URL(postEditURL(t.ID, post.No)) } class="tool">[edit]</a>
+			<a href={ templ.URL(postDeleteURL(t.ID, post.No)) } class="tool">
+				if post.AuthorID == p.User.ID {
+					[delete]
+				} else {
+					[remove]
+				}
+			</a>
+		</span>
+	} else if p.User.IsMod() && post.DeletedAt != nil && post.AuthorID != 0 {
+		<form method="post" action={ templ.URL(fmt.Sprintf("/t/%d/p/%d/restore", t.ID, post.No)) } class="inline tools">
+			@csrfField(p)
+			<button type="submit" class="link tool">[restore]</button>
+		</form>
+	}
+}
+
+templ threadModTools(p Page, t models.Thread) {
+	if p.User.IsMod() {
+		<span class="tools">
+			<form method="post" action={ templ.URL(fmt.Sprintf("/t/%d/lock", t.ID)) } class="inline">
+				@csrfField(p)
+				<input type="hidden" name="on" value={ onOff(t.LockedAt == nil) }/>
+				if t.LockedAt == nil {
+					<button type="submit" class="link tool">[lock]</button>
+				} else {
+					<button type="submit" class="link tool">[unlock]</button>
+				}
+			</form>
+			<form method="post" action={ templ.URL(fmt.Sprintf("/t/%d/pin", t.ID)) } class="inline">
+				@csrfField(p)
+				<input type="hidden" name="on" value={ onOff(!t.Pinned) }/>
+				if t.Pinned {
+					<button type="submit" class="link tool">[unpin]</button>
+				} else {
+					<button type="submit" class="link tool">[pin]</button>
+				}
+			</form>
+			<a href={ templ.URL(fmt.Sprintf("/t/%d/delete", t.ID)) } class="tool">[delete thread]</a>
+		</span>
 	}
 }

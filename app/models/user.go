@@ -27,7 +27,15 @@ type User struct {
 	Bio          string
 	Art          string
 	CreatedAt    time.Time
+	DeleteAt     *time.Time
+	Role         string
+	BannedAt     *time.Time
+	BanReason    string
 }
+
+func (u *User) IsMod() bool   { return u != nil && (u.Role == RoleMod || u.Role == RoleAdmin) }
+func (u *User) IsAdmin() bool { return u != nil && u.Role == RoleAdmin }
+func (u *User) Banned() bool  { return u != nil && u.BannedAt != nil }
 
 func NormalizeUsername(name string) string {
 	return strings.ToLower(strings.TrimSpace(name))
@@ -82,9 +90,9 @@ var dummyHash, _ = bcrypt.GenerateFromPassword([]byte("dummy-password"), bcrypt.
 func (s *Store) UserByUsername(ctx context.Context, username string) (*User, error) {
 	u := &User{}
 	err := s.DB.QueryRow(ctx,
-		`SELECT id, username, password_hash, bio, art, created_at FROM users WHERE username = $1`,
+		`SELECT id, username, password_hash, bio, art, created_at, delete_at, role, banned_at, ban_reason FROM users WHERE username = $1`,
 		NormalizeUsername(username),
-	).Scan(&u.ID, &u.Username, &u.PasswordHash, &u.Bio, &u.Art, &u.CreatedAt)
+	).Scan(&u.ID, &u.Username, &u.PasswordHash, &u.Bio, &u.Art, &u.CreatedAt, &u.DeleteAt, &u.Role, &u.BannedAt, &u.BanReason)
 	if err != nil {
 		return nil, notFound(err)
 	}

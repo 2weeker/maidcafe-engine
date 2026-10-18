@@ -27,11 +27,11 @@ func (s *Store) CreateSession(ctx context.Context, userID int64) (string, time.T
 func (s *Store) UserBySession(ctx context.Context, token string) (*User, error) {
 	u := &User{}
 	err := s.DB.QueryRow(ctx,
-		`SELECT u.id, u.username, u.password_hash, u.bio, u.art, u.created_at
+		`SELECT u.id, u.username, u.password_hash, u.bio, u.art, u.created_at, u.delete_at, u.role, u.banned_at, u.ban_reason
 		 FROM sessions s JOIN users u ON u.id = s.user_id
 		 WHERE s.token_hash = $1 AND s.expires_at > now()`,
 		hashToken(token),
-	).Scan(&u.ID, &u.Username, &u.PasswordHash, &u.Bio, &u.Art, &u.CreatedAt)
+	).Scan(&u.ID, &u.Username, &u.PasswordHash, &u.Bio, &u.Art, &u.CreatedAt, &u.DeleteAt, &u.Role, &u.BannedAt, &u.BanReason)
 	if err != nil {
 		return nil, notFound(err)
 	}
