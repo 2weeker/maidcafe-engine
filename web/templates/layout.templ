@@ -19,7 +19,14 @@ templ Layout(p Page) {
 		<body>
 			<div class="wrap" id="top">
 				<header class="masthead box">
-					<a href="/" class="banner-link"><pre class="banner" aria-label="maidcafe">{ banner }</pre></a>
+					<a href="/" class="banner-link" aria-label="maidcafe">
+						<svg class="banner-eyes" viewBox="0 0 450 150" role="presentation" aria-hidden="true">
+							for i, line := range eyeLines {
+								<text x="0" y={ eyeBaseline(i) } font-size="10" textLength="450" lengthAdjust="spacingAndGlyphs">{ line }</text>
+							}
+						</svg>
+						<pre class="banner" aria-hidden="true">{ banner }</pre>
+					</a>
 					<nav class="nav">
 						<a href="/">[home]</a>
 						@themeToggle(p)
@@ -47,7 +54,9 @@ templ Layout(p Page) {
 						}
 					</nav>
 				</header>
-				@searchBar(p)
+				if p.Search {
+					@searchBar(p)
+				}
 				if p.Error != "" {
 					<div class="box alert" role="alert">!! { p.Error }</div>
 				}
@@ -73,13 +82,15 @@ templ Layout(p Page) {
 					{ children... }
 				</main>
 				<footer class="footer" id="bottom">
-					<pre>{ footerArt }</pre>
-					if Site.About {
-						<a href="/about" class="footer-link">[{ Site.AboutTitle }]</a>
-					}
-					if Site.Textboard && p.User == nil {
-						<a href="/login" class="footer-link">[staff]</a>
-					}
+					<pre>{ footerArt() }</pre>
+					<nav class="footer-links">
+						if Site.About {
+							<a href="/about" class="footer-link" { current(p, "/about")... }>[{ Site.AboutTitle }]</a>
+						}
+						if Site.Textboard && p.User == nil {
+							<a href="/login" class="footer-link" { current(p, "/login")... }>[admin]</a>
+						}
+					</nav>
 				</footer>
 			</div>
 		</body>
@@ -198,4 +209,21 @@ templ markdown(src string) {
 
 templ formatHint() {
 	<p class="hint">**bold** *italic* ~~strike~~ `code` ```block``` [link](url) &gt; quote &gt;text [spoiler]hidden[/spoiler] &gt;&gt;1 [aa]art[/aa]</p>
+}
+
+templ kaomojiPicker() {
+	<details class="kaomoji">
+		<summary>[kaomoji]</summary>
+		<p class="hint">click one to select it, then copy and paste it into your post.</p>
+		for _, g := range Kaomoji {
+			<div class="kaomoji-group">
+				<span class="kaomoji-label">{ g.Name }</span>
+				<ul>
+					for _, face := range g.Faces {
+						<li class="kao">{ face }</li>
+					}
+				</ul>
+			</div>
+		}
+	</details>
 }

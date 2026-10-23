@@ -25,6 +25,8 @@ app/
   captcha/                 captcha store (issue, verify, expire); captchaimg/ draws the PNG
   limits/                  token-bucket rate limits, failure lockouts, address keys
   routes/                  the URL table (shared routes, plus a cafe or textboard set by mode)
+  tripcode/                classic 2channel/futaba tripcodes (DES crypt port)
+  version/                 the application version shown in the footer and startup log
 web/
   templates/               V: *.templ views + small Go helpers (URLs, view structs)
   markup/                  user text -> safe HTML (restricted markdown, >>N, [aa])
@@ -81,6 +83,10 @@ for the theme button, optional error), which `controllers.page()` fills.
   [features/formatting.md](features/formatting.md)).
 - ASCII art (banner, footer, profile art) is passed as Go strings into `<pre>` so templ's
   whitespace handling can't disturb it.
+- The masthead's braille eyes (`bannerEyes`) are the exception: braille isn't in the monospace
+  font, so a wider fallback would draw them at the wrong size. Each line becomes an SVG `<text>`
+  with `textLength`, and the SVG is `49ch` wide, so the eyes always span the 49-column MAIDCAFE
+  lettering. The lettering stays in `<pre>`.
 
 ## Security model
 

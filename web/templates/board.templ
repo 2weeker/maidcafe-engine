@@ -14,7 +14,6 @@ templ BoardPage(p Page, v BoardIndex) {
 			<h1 class="huge">/{ v.Board.Slug }/ <span class="thin">{ v.Board.Name }</span></h1>
 			<p class="muted">{ v.Board.Description }</p>
 			<p class="board-rules">
-				bump limit { itoa(v.Rules.BumpLimit) } :: post limit { itoa(v.Rules.PostLimit) } :: { itoa(v.Rules.MaxThreads) } live threads ::
 				<a href={ templ.URL(boardURL(v.Board.Slug) + "/archive") }>[archive]</a>
 			</p>
 		</section>
@@ -30,7 +29,7 @@ templ BoardPage(p Page, v BoardIndex) {
 					<input id="thread-title" type="text" name="title" maxlength="120" required value={ v.Draft.Title }/>
 					<label for="thread-body">body</label>
 					<textarea id="thread-body" name="body" rows="8" maxlength="4000" required>{ v.Draft.Body }</textarea>
-					@formatHint()
+					@kaomojiPicker()
 					@captchaField(v.Guard)
 					<div class="row-between">
 						if Site.Textboard {
@@ -183,7 +182,7 @@ templ ThreadPage(p Page, v ThreadView) {
 						<label for="reply-body">reply as ~{ p.User.Username }</label>
 					}
 					<textarea id="reply-body" name="body" rows="6" maxlength="4000" required>{ v.Draft }</textarea>
-					@formatHint()
+					@kaomojiPicker()
 					@captchaField(v.Guard)
 					<div class="row-between">
 						<span class="checks">

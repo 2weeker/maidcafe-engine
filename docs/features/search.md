@@ -1,6 +1,6 @@
 # Search
 
-The bar under the masthead on every page is a plain GET form: `/search?q=…&in=…`. No JavaScript.
+The bar under the masthead on the home page (inside a `[search]` toggle) is a plain GET form: `/search?q=…&in=…`. No JavaScript.
 
 ```
 [search://][ q                       ][ * all ▾ ][ go >> ]

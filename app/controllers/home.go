@@ -13,12 +13,15 @@ func (ctl *Controller) Home(c fiber.Ctx) error {
 		if err != nil {
 			return err
 		}
-		return render(c, fiber.StatusOK, templates.BoardsPage(ctl.page(c, "Home"), boards))
+		p := ctl.page(c, "Home")
+		p.Search = true
+		return render(c, fiber.StatusOK, templates.BoardsPage(p, boards))
 	}
 	return ctl.renderHome(c, fiber.StatusOK, ctl.page(c, "Home"), "", nil)
 }
 
 func (ctl *Controller) renderHome(c fiber.Ctx, status int, p templates.Page, draft string, selected []string) error {
+	p.Search = true
 	ctx := c.Context()
 	viewer := viewerID(c)
 	guest := viewer == 0

@@ -23,10 +23,11 @@ activity and an archive link. The home sidebar shows only the first `sidebar.boa
 
 Top to bottom:
 
-1. **Header:** name, description, and the board's rules: `bump limit 300 :: post limit 1000 ::
-   150 live threads :: [archive]`.
+1. **Header:** name, description, and an `[archive]` link. The board's limits aren't shown here.
+   They appear as status tags on the threads they affect.
 2. **`[ start a new thread ]`:** a collapsible form (title ≤ 120 chars, body ≤ 4000) with tag
    dropdowns (see [tags.md](tags.md)). It opens by itself if your last attempt had an error.
+   It and the reply form both carry a [kaomoji picker](#kaomoji-picker).
 3. **Subject list:** 2ch-style numbered list of the threads on this page with their post counts,
    linking to each preview below.
 4. **Thread previews (futaba style):** each thread's title, status tag and `#tag` chips, its OP, then
@@ -93,6 +94,18 @@ page shows your text in a read-only box so you can copy it.
 Archived threads leave the board index and appear in the archive list (title, author, post
 count, archive time), newest first. They stay readable at their usual URL, tagged `archived`,
 with no reply box.
+
+## Kaomoji picker
+
+Under the body box in the thread and reply forms sits a collapsed `[kaomoji]` section: faces
+grouped as happy, love, sad, angry, cafe, cats and misc. There is no JavaScript, so a click can't
+insert text into the box. Instead each face has `user-select: all`, so one click selects all of
+it, ready to copy and paste.
+
+The list is `Kaomoji` in `web/templates/kaomoji.go`. Faces must come through the post formatter
+unchanged, and `TestKaomojiRenderVerbatim` fails if one doesn't. That's why the shrug is written
+`¯＼＿(ツ)＿／¯` with full-width strokes: a plain `\_` is a markdown escape, and paired `_` or `*`
+turn into italics.
 
 ## Formatting
 

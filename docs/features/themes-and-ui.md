@@ -23,20 +23,21 @@ light  ->  eyesaver  ->  dark  ->  light ...
 ## Page layout
 
 ```
-┌──────────────────────────────────────────────┐▌  masthead: ASCII banner + nav, the one box
-│  __  __   _   ___ ...          [home] [light] │▌  with a hard offset shadow
+┌──────────────────────────────────────────────┐▌  masthead: the one box with a hard
+│              eyes over lettering             │▌  offset shadow; art and nav centered,
+│            [home] [light] [name]             │▌  nav under the art
 └──────────────────────────────────────────────┘▌
 ▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀
-[search://][ notes, threads, ~users, #tags   ][all ▾][go >>]
+[search]  (home page only; a centered toggle that opens to [search://][ query ][all ▾][go >>])
 !! error banner (when a form fails)
 ┌─ main column ──────────────┐ ┌─ sidebar ──────┐
 │ ==[ NOTES ]==              │ │ ==[ BOARDS ]== │
 │ composer + tag pickers,    │ │ ==[ USERS ]==  │
 │ [recent] [top] [following] │ │ ==[ TAGS ]==   │
 └────────────────────────────┘ └────────────────┘
-+--------------------------------------+
-| maidcafe :: text only :: no js :: ok |
-+--------------------------------------+
++-----------------+
+| maidcafe v0.1.0 |
++-----------------+
 ```
 
 Nav: `[home] [light]` (the theme button), then `[admin]` (mods only) `[~you] [logout]` or
@@ -51,10 +52,12 @@ window its lower part comes into view only once the page is scrolled to the bott
 
 ## Search bar
 
-A full-width GET form under the masthead on every page: an inverted `search://` label, a text
-field (*notes, threads, ~users, #tags*), a scope dropdown and a `go >>` button. The field keeps
-your query on the results page. On phones the `search://` label hides to save room. See
-[search.md](search.md).
+A centered `[search]` toggle under the masthead on the home page only, a plain `<details>`
+element, so no script is involved. Controllers turn it on with `Page.Search`, and only `Home`
+does. It starts closed. Inside is a GET form, centered and at most 640px wide: an inverted
+`search://` label, a text field (*notes, threads, ~users, #tags*), a scope dropdown and a
+`go >>` button. On phones the `search://` label hides to save room. The results page has no
+bar of its own, so a new search starts from home. See [search.md](search.md).
 
 ## Sidebar
 
@@ -75,8 +78,14 @@ page wrapper and the footer, so they work with no JavaScript and show up in the 
 
 ## Footer
 
-The ASCII box under every page, with an `[about]` link beneath it when the about page is on. The
-link's label is the configured `about.title` ([about.md](about.md)).
+The ASCII box under every page holds the name and running version, `maidcafe v0.1.0`, and sizes
+itself to fit. The version comes from `app/version` (`Version`), which is also printed in the
+startup log. Bump it there when cutting a release.
+
+Under the box, on one line, sits an `[about]` link when the about page is on, labelled with the
+configured `about.title` ([about.md](about.md)). In textboard mode, logged-out visitors also see
+`[admin]`, which opens `/login`. The link for the page you are on (`/about` or `/login`) is drawn inverted, black
+with white text, and carries `aria-current="page"`.
 
 ## Pagination
 

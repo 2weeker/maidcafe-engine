@@ -22,6 +22,7 @@ import (
 	"maidcafe-engine/app/middleware"
 	"maidcafe-engine/app/models"
 	"maidcafe-engine/app/routes"
+	"maidcafe-engine/app/version"
 	"maidcafe-engine/web"
 )
 
@@ -62,7 +63,7 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	log.Printf("mode: %s", cfg.Mode)
+	log.Printf("maidcafe %s, mode: %s", version.String(), cfg.Mode)
 
 	pool, err := database.Connect(ctx, cfg.Database.URL)
 	if err != nil {

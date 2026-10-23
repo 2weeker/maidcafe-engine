@@ -20,7 +20,7 @@ can switch back and forth; what's hidden in one mode is still there in the other
 | Notes, profiles, following, users page, tags | on | off: every `/n/`, `/u/:name`, `/users` and `/tags` URL is a 404 |
 | Tags on threads | tag dropdowns and `#tag` chips | hidden |
 | Registration | open unless `registration.enabled: false` | off: `/register` is a 404 and there is no register link |
-| Login | `[login]` in the nav | a `[staff]` link in the footer opens `/login` |
+| Login | `[login]` in the nav | an `[admin]` link in the footer, beside the about link, opens `/login` |
 | Search | `all` / `notes` / `threads` / `users` / `tags` | thread titles and posts only; no scope dropdown |
 | Names | the account's username | the board's default name, or a name with a classic tripcode set on `/name` ([tripcodes.md](tripcodes.md)) |
 | Captcha | login and register | login, plus the thread and reply forms for posters without an account; the honeypot is on every form |
