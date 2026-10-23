@@ -158,10 +158,10 @@ func (s *Store) DeleteThread(ctx context.Context, threadID int64) error {
 func (s *Store) PostRaw(ctx context.Context, threadID int64, no int) (Post, error) {
 	var p Post
 	var userID *int64
-	err := s.DB.QueryRow(ctx, `SELECT p.id, p.thread_id, p.no, coalesce(u.username, 'deleted'), p.body, p.sage, p.created_at,
-			p.edited_at, p.deleted_at, p.removed, p.user_id
+	err := s.DB.QueryRow(ctx, `SELECT p.id, p.thread_id, p.no, coalesce(u.username, ''), p.body, p.sage, p.created_at,
+			p.edited_at, p.deleted_at, p.removed, p.user_id, coalesce(u.role, ''), p.name, p.trip
 		FROM posts p LEFT JOIN users u ON u.id = p.user_id WHERE p.thread_id = $1 AND p.no = $2`, threadID, no).Scan(
-		&p.ID, &p.ThreadID, &p.No, &p.Author, &p.Body, &p.Sage, &p.CreatedAt, &p.EditedAt, &p.DeletedAt, &p.Removed, &userID)
+		&p.ID, &p.ThreadID, &p.No, &p.Author, &p.Body, &p.Sage, &p.CreatedAt, &p.EditedAt, &p.DeletedAt, &p.Removed, &userID, &p.AuthorRole, &p.Name, &p.Trip)
 	if err != nil {
 		return p, notFound(err)
 	}
@@ -189,7 +189,7 @@ func (s *Store) DeletePost(ctx context.Context, postID int64, byMod bool) error 
 }
 
 func (s *Store) RestorePost(ctx context.Context, postID int64) error {
-	_, err := s.DB.Exec(ctx, `UPDATE posts SET deleted_at = NULL, removed = false WHERE id = $1`, postID)
+	_, err := s.DB.Exec(ctx, `UPDATE posts SET deleted_at = NULL, removed = false WHERE id = $1 AND (removed OR user_id IS NOT NULL)`, postID)
 	return err
 }
 

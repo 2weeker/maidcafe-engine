@@ -37,6 +37,7 @@ On startup the app:
 | `make logs` | Follow the app's logs |
 | `make ps` | Container status |
 | `make psql` | Open a `psql` shell on the database |
+| `make adduser NAME=alice [ROLE=mod]` | Create an account from the shell (asks for the password, or reads `PASSWORD`). The way to make the first admin in [textboard mode](features/textboard-mode.md) |
 | `make generate` | Run `templ generate` locally so editors see the generated Go |
 | `make fmt` | `templ fmt` the templates and `gofmt` the Go code |
 | `make vet` | Generate, then `go vet ./...` |
@@ -48,6 +49,10 @@ On startup the app:
 value stops the app with a clear error in `make logs`.
 
 **Change the port:** `APP_PORT=9000 make up`.
+
+**Run as an anonymous textboard:** set `mode: textboard` in `config.yaml`, `make restart`, then
+`make adduser NAME=<one of admin.usernames>` to create the first admin. See
+[features/textboard-mode.md](features/textboard-mode.md).
 
 **Start over with an empty database:** `make clean && make up`. This deletes every account and post.
 

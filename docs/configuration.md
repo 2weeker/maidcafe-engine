@@ -18,12 +18,14 @@ defaults for the rest.
 
 Loading is strict. The app refuses to start, and says why, when:
 
+- `mode` isn't `cafe` or `textboard`,
 - a key is unknown (catches typos like `bump_limt`),
 - `tags.max_length` is outside 1-32 or `tags.max_per_post` outside 0-20,
 - any `sidebar` count, `guests.boards`, `accounts.deletion_grace_hours` or a `cooldowns` value is
   negative,
 - any page size or `guests.notes` is below 1,
-- `bump_limit` < 1, `post_limit` < 2, `max_threads` < 1, or `preview_replies` < 0,
+- `bump_limit` < 1, `post_limit` < 2, `max_threads` < 1, `preview_replies` < 0, or `anon_name`
+  empty or longer than 30 characters,
 - `bump_limit` is greater than `post_limit`,
 - `captcha.length` is outside 4-10, `captcha.lifetime_seconds` outside 30-3600,
   `captcha.lockout.failures` below 1 or `captcha.lockout.seconds` negative,
@@ -35,6 +37,8 @@ for the defaults and for every board override.
 ## Reference
 
 ```yaml
+mode: cafe
+
 server:
   listen_addr: ":8080"
   cookie_secure: false
@@ -118,6 +122,7 @@ boards:
     post_limit: 1000
     max_threads: 150
     preview_replies: 5
+    anon_name: Anonymous
   overrides:
     random:
       bump_limit: 10
@@ -127,6 +132,18 @@ boards:
     meta:
       max_threads: 30
 ```
+
+### `mode`
+
+| Value | Meaning |
+| --- | --- |
+| `cafe` | The default: the microblog (notes, profiles, following, tags), the boards, open registration |
+| `textboard` | Anonymous boards only. Notes, profiles, users, tags and registration are switched off; anyone can post on the boards; accounts are for staff and are created with `make adduser` or from the admin panel |
+
+See [features/textboard-mode.md](features/textboard-mode.md). In textboard mode the `guests`,
+`registration`, `sidebar.users`, `sidebar.tags`, `tags`, `cooldowns.note_seconds` and
+`rate_limits.registrations` settings have no effect, and the `cooldowns` for posts and threads
+apply per address instead of per account.
 
 ### `server`
 

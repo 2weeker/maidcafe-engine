@@ -37,11 +37,14 @@ func RequireUser(c fiber.Ctx) error {
 }
 
 func RequirePoster(c fiber.Ctx) error {
-	u := CurrentUser(c)
-	if u == nil {
+	if CurrentUser(c) == nil {
 		return c.Redirect().To("/login")
 	}
-	if u.Banned() {
+	return AllowAnon(c)
+}
+
+func AllowAnon(c fiber.Ctx) error {
+	if u := CurrentUser(c); u != nil && u.Banned() {
 		msg := "your account is banned"
 		if u.BanReason != "" {
 			msg += ": " + u.BanReason

@@ -2,6 +2,7 @@ package templates
 
 import (
 	"maidcafe-engine/app/models"
+	"maidcafe-engine/app/tripcode"
 	"maidcafe-engine/web/markup"
 )
 
@@ -22,16 +23,23 @@ templ Layout(p Page) {
 					<nav class="nav">
 						<a href="/">[home]</a>
 						@themeToggle(p)
+						if Site.Textboard {
+							<a href="/name">[name]</a>
+						}
 						if p.User != nil {
 							if p.User.IsMod() {
 								<a href="/admin">[admin]</a>
 							}
-							<a href={ templ.URL(userURL(p.User.Username)) }>[~{ p.User.Username }]</a>
+							if Site.Textboard {
+								<a href="/settings">[~{ p.User.Username }]</a>
+							} else {
+								<a href={ templ.URL(userURL(p.User.Username)) }>[~{ p.User.Username }]</a>
+							}
 							<form method="post" action="/logout" class="inline">
 								@csrfField(p)
 								<button type="submit" class="link">[logout]</button>
 							</form>
-						} else {
+						} else if !Site.Textboard {
 							<a href="/login">[login]</a>
 							if Site.RegistrationOpen {
 								<a href="/register">[register]</a>
@@ -68,6 +76,9 @@ templ Layout(p Page) {
 					<pre>{ footerArt }</pre>
 					if Site.About {
 						<a href="/about" class="footer-link">[{ Site.AboutTitle }]</a>
+					}
+					if Site.Textboard && p.User == nil {
+						<a href="/login" class="footer-link">[staff]</a>
 					}
 				</footer>
 			</div>
@@ -107,6 +118,52 @@ templ jumpDown() {
 
 templ jumpUp() {
 	<nav class="jump up" aria-label="jump to top"><a href="#top" class="act">^ top</a></nav>
+}
+
+templ authorLink(name, role, postName, trip, anon string) {
+	if name == "" && trip != "" {
+		if postName == "" {
+			<span class="author anon">{ anon }</span>
+		} else {
+			<span class="author">{ postName }</span>
+		}
+		<span class="trip">{ tripcode.Mark }{ trip }</span>
+	} else if name == "" {
+		if Site.Textboard {
+			<span class="author anon">{ anon }</span>
+		} else {
+			<span class="author anon">~deleted</span>
+		}
+	} else if Site.Textboard {
+		<span class="author">~{ name }</span>
+		if role == models.RoleMod || role == models.RoleAdmin {
+			<span class="capcode">## { role }</span>
+		}
+	} else {
+		<a href={ templ.URL(userURL(name)) } class="author">~{ name }</a>
+	}
+}
+
+templ postingAs(v IdentityView) {
+	if Site.Textboard {
+		<p class="posting-as">
+			posting as <b>{ v.Shown() }</b>
+			if v.Trip == "" {
+				<a href="/name" class="act">set a name &amp; tripcode</a>
+			} else {
+				<a href="/name" class="act">change</a>
+			}
+		</p>
+	}
+}
+
+templ staffCheck(p Page, on bool) {
+	if Site.Textboard && p.User.IsMod() {
+		<label class="check">
+			<input type="checkbox" name="staff" value="1" checked?={ on }/>
+			sign as ~{ p.User.Username } <span class="muted">(## { p.User.Role })</span>
+		</label>
+	}
 }
 
 templ csrfField(p Page) {

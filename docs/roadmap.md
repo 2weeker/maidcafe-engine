@@ -41,8 +41,8 @@
 | --- | --- |
 | Catalog view | A grid of all threads with OP excerpts and reply counts |
 | Daily per-thread IDs | `ID:aB3xK9pQ` hashes of user + day + board; follow people within a thread without names |
-| Anonymous boards | A per-board setting to hide usernames, with a board-specific default name |
-| Tripcodes | `name#secret` → `name ◆Xy9…` on anonymous boards |
+| Per-board anonymity | `mode: textboard` makes the whole site anonymous ([textboard-mode.md](features/textboard-mode.md)); a per-board switch, and a board-specific default name, aren't built |
+| Secure tripcodes | Classic `name#secret` → `name ◆Xy9…` is built ([tripcodes.md](features/tripcodes.md)); a server-salted `##secure` variant isn't |
 | Capcodes | `## Admin` styling for staff posts (needs roles) |
 | Post ranges in URLs | `/t/42/l50`, `/t/42/100-200`, `/t/42/5` |
 | "New since last visit" | An unread marker per thread, "3 new" on the board list |

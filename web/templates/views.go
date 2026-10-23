@@ -1,10 +1,14 @@
 package templates
 
-import "maidcafe-engine/app/models"
+import (
+	"maidcafe-engine/app/models"
+	"maidcafe-engine/app/tripcode"
+)
 
 const HoneypotField = "website"
 
 type SiteSettings struct {
+	Textboard        bool
 	RegistrationOpen bool
 	About            bool
 	AboutTitle       string
@@ -76,9 +80,11 @@ type TagView struct {
 }
 
 type AdminUsersView struct {
-	Users []models.AdminUser
-	Query string
-	Pager models.Pager
+	Users   []models.AdminUser
+	Query   string
+	NewName string
+	NewRole string
+	Pager   models.Pager
 }
 
 type SearchView struct {
@@ -92,9 +98,49 @@ type SearchView struct {
 	Tags         []models.Tag
 	Pager        models.Pager
 	PostsPerPage int
+	AnonName     func(slug string) string
+}
+
+type IdentityView struct {
+	Name    string
+	Trip    string
+	Default string
+}
+
+func (v IdentityView) Shown() string {
+	if v.Trip == "" {
+		return v.Default
+	}
+	if v.Name == "" {
+		return v.Default + " " + tripcode.Mark + v.Trip
+	}
+	return v.Name + " " + tripcode.Mark + v.Trip
+}
+
+type NameView struct {
+	Draft      string
+	Identity   IdentityView
+	BoardNames [][2]string
+}
+
+func AuthorName(username, name, trip string) string {
+	switch {
+	case username != "":
+		return "~" + username
+	case trip != "" && name != "":
+		return name + " " + tripcode.Mark + trip
+	case trip != "":
+		return "Anonymous " + tripcode.Mark + trip
+	case Site.Textboard:
+		return "Anonymous"
+	}
+	return "~deleted"
 }
 
 func SearchScopes(loggedIn bool) []string {
+	if Site.Textboard {
+		return []string{"threads"}
+	}
 	if loggedIn {
 		return []string{"all", "notes", "threads", "users", "tags"}
 	}

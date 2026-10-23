@@ -22,11 +22,16 @@ type Controller struct {
 
 func New(store *models.Store, cfg config.Config) *Controller {
 	templates.Site = templates.SiteSettings{
-		RegistrationOpen: cfg.Registration.Enabled,
+		Textboard:        cfg.Textboard(),
+		RegistrationOpen: cfg.Registration.Enabled && !cfg.Textboard(),
 		About:            cfg.About.Enabled,
 		AboutTitle:       cfg.About.Title,
 	}
 	return &Controller{Store: store, Config: cfg, Guards: newGuards(cfg)}
+}
+
+func (ctl *Controller) anonName(slug string) string {
+	return ctl.Config.Boards.For(slug).AnonName
 }
 
 func (ctl *Controller) page(c fiber.Ctx, title string) templates.Page {

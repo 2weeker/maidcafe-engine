@@ -24,6 +24,24 @@ unit tests (below).
 Each feature was verified against a throwaway Compose stack (`docker compose -p mctest`, port
 8090, deleted afterwards) with curl and headless Firefox screenshots:
 
+- textboard mode on a throwaway stack: front page is the boards list with no login or register
+  link and no scope dropdown; notes, profile, users, tags and register URLs 404; a guest can
+  start a thread and reply and both show as Anonymous with no edit tools; a second post within
+  `post_seconds` and a thread over `threads_per_day` get 429; search finds the post and has no
+  tabs; an admin made with `adduser` sees the staff checkbox, posts anonymously without it and
+  with a `## admin` capcode with it; a removed anonymous post shows `[restore]` and restores;
+  the admin panel creates a mod account (422 on a duplicate, 400 on an invalid role) and logs
+  it; settings shows no bio form. The live cafe stack was rebuilt afterwards and spot-checked
+- composer captcha and honeypot (textboard, captcha on): the guest thread form shows the image
+  and the hidden field; no answer 422; a wrong answer 422 with the draft kept and a new image;
+  honeypot filled 400; three wrong answers 429 with `Retry-After` and a disabled button
+- tripcodes (textboard): `app/tripcode` is tested against ten `crypt(3)` reference values from
+  perl; on a throwaway stack the `/name` page refuses a name without a key, saves name+key into
+  an `HttpOnly` cookie, the composers say *posting as nanashi ◆WokonZwxw2*, threads and replies
+  render the name and green code, a key alone gives `Anonymous ◆…`, `◆` is stripped from names
+  and `name#key` splits, clear removes the cookie, a board with `anon_name` overridden shows it
+  on its composer and posts, search renders the code, the honeypot returns 400 for guests and
+  staff, and a staff reply with **sign as** still shows `~boss`
 - registration, duplicate usernames, login/logout, CSRF rejection (403), anonymous POSTs
   redirected to `/login`
 - notes: posting, validation (422), escaping, likes/reposts/replies with idempotent counters,

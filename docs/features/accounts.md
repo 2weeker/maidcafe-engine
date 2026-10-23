@@ -1,5 +1,8 @@
 # Accounts
 
+This page describes the default `cafe` mode. In [textboard mode](textboard-mode.md) registration
+is off, profiles don't exist, and accounts are created by admins for moderators only.
+
 ## Registration (no email)
 
 `/register` asks for three things: a username, a password, and the password again. Nothing else:

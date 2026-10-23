@@ -30,9 +30,9 @@ func (s *Store) SearchNotes(ctx context.Context, viewer int64, q string, limit, 
 }
 
 func (s *Store) SearchPosts(ctx context.Context, q string, limit, offset int) ([]SearchPost, error) {
-	rows, err := s.DB.Query(ctx, `SELECT p.id, p.thread_id, p.no, u.username, p.body, p.sage, p.created_at, t.title, b.slug
-		FROM posts p JOIN users u ON u.id = p.user_id JOIN threads t ON t.id = p.thread_id JOIN boards b ON b.id = t.board_id
-		WHERE p.user_id IS NOT NULL AND p.deleted_at IS NULL AND to_tsvector('simple', p.body) @@ websearch_to_tsquery('simple', $1)
+	rows, err := s.DB.Query(ctx, `SELECT p.id, p.thread_id, p.no, coalesce(u.username, ''), coalesce(u.role, ''), p.name, p.trip, p.body, p.sage, p.created_at, t.title, b.slug
+		FROM posts p LEFT JOIN users u ON u.id = p.user_id JOIN threads t ON t.id = p.thread_id JOIN boards b ON b.id = t.board_id
+		WHERE p.deleted_at IS NULL AND to_tsvector('simple', p.body) @@ websearch_to_tsquery('simple', $1)
 		ORDER BY ts_rank(to_tsvector('simple', p.body), websearch_to_tsquery('simple', $1)) DESC, p.created_at DESC, p.id DESC
 		LIMIT $2 OFFSET $3`, q, limit, offset)
 	if err != nil {
@@ -40,7 +40,7 @@ func (s *Store) SearchPosts(ctx context.Context, q string, limit, offset int) ([
 	}
 	return pgx.CollectRows(rows, func(r pgx.CollectableRow) (SearchPost, error) {
 		var p SearchPost
-		err := r.Scan(&p.ID, &p.ThreadID, &p.No, &p.Author, &p.Body, &p.Sage, &p.CreatedAt, &p.ThreadTitle, &p.BoardSlug)
+		err := r.Scan(&p.ID, &p.ThreadID, &p.No, &p.Author, &p.AuthorRole, &p.Name, &p.Trip, &p.Body, &p.Sage, &p.CreatedAt, &p.ThreadTitle, &p.BoardSlug)
 		return p, err
 	})
 }

@@ -20,6 +20,8 @@ never rename one that has been applied; add a new numbered file instead.
 | `003_profile_art.sql` | `users.art` |
 | `004_board_features.sql` | Per-thread post numbers (`posts.no`, backfilled), `posts.sage`, `threads.archived_at`, `post_refs` (backfilled from existing `>>N`) |
 | `005_follows_tags_search.sql` | `follows`, `tags`, `note_tags`, `thread_tags`, full-text indexes for search |
+| `012_tripcodes.sql` | `posts.name` and `posts.trip` for anonymous posts with a [tripcode](features/tripcodes.md) |
+| `011_anonymous_posts.sql` | Marks posts that already had no author as deleted (`deleted_at`), so that from now on a post with no `user_id` and no `deleted_at` is an anonymous post ([textboard mode](features/textboard-mode.md)) |
 | `010_moderation.sql` | `users.role/banned_at/ban_reason`, `posts.edited_at/deleted_at/removed`, `notes.edited_at`, `threads.locked_at/pinned`, `mod_actions` |
 | `009_account_deletion.sql` | `users.delete_at`; `threads.user_id` and `posts.user_id` become nullable with `ON DELETE SET NULL` so a deleted author leaves `~deleted` posts behind |
 | `008_drop_chat.sql` | Drops the chat tables (`conversations`, `chat_members`, `messages`) that migrations 006 and 007 created before the feature was removed; a no-op on fresh databases |

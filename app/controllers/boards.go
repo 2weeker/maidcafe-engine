@@ -21,6 +21,14 @@ func cooldownError(err error) error {
 	return err
 }
 
+func (ctl *Controller) poster(c fiber.Ctx) *models.User {
+	me := middleware.CurrentUser(c)
+	if ctl.Config.Textboard() && (me == nil || !me.IsMod() || c.FormValue("staff") != "1") {
+		return nil
+	}
+	return me
+}
+
 func (ctl *Controller) Board(c fiber.Ctx) error {
 	board, err := ctl.Store.BoardBySlug(c.Context(), c.Params("slug"))
 	if err != nil {
@@ -35,18 +43,41 @@ func (ctl *Controller) CreateThread(c fiber.Ctx) error {
 		return err
 	}
 	rules := ctl.Config.Boards.For(board.Slug)
-	draft := templates.ThreadDraft{Title: c.FormValue("title"), Body: c.FormValue("body"), Tags: tagFields(c, ctl.Config.Tags.MaxPerPost)}
-	me := middleware.CurrentUser(c)
-	if err := cooldownError(ctl.Store.ThreadQuota(c.Context(), me.ID, ctl.Config.Cooldowns.ThreadsPerDay)); err != nil {
-		return err
+	draft := templates.ThreadDraft{Title: c.FormValue("title"), Body: c.FormValue("body"), Staff: c.FormValue("staff") == "1"}
+	if g := ctl.postGate(c); g != nil {
+		p := ctl.page(c, "/"+board.Slug+"/")
+		p.Error = g.msg
+		return ctl.renderBoard(c, g.status, p, board, draft)
 	}
-	if err := cooldownError(ctl.Store.PostCooldown(c.Context(), me.ID, time.Duration(ctl.Config.Cooldowns.PostSeconds)*time.Second)); err != nil {
-		return err
+	var userID int64
+	var tagIDs []int64
+	if me := ctl.poster(c); me != nil {
+		userID = me.ID
+		if err := cooldownError(ctl.Store.ThreadQuota(c.Context(), me.ID, ctl.Config.Cooldowns.ThreadsPerDay)); err != nil {
+			return err
+		}
+		if err := cooldownError(ctl.Store.PostCooldown(c.Context(), me.ID, time.Duration(ctl.Config.Cooldowns.PostSeconds)*time.Second)); err != nil {
+			return err
+		}
+	} else {
+		if err := anonCooldown(c, ctl.Guards.AnonThreads, "start a thread"); err != nil {
+			return err
+		}
+		if err := anonCooldown(c, ctl.Guards.AnonPosts, "post"); err != nil {
+			return err
+		}
 	}
-	tagIDs, err := ctl.Store.ResolveTags(c.Context(), draft.Tags, ctl.Config.Tags.MaxPerPost)
+	if !ctl.Config.Textboard() {
+		draft.Tags = tagFields(c, ctl.Config.Tags.MaxPerPost)
+		tagIDs, err = ctl.Store.ResolveTags(c.Context(), draft.Tags, ctl.Config.Tags.MaxPerPost)
+	}
+	var ident models.Identity
+	if userID == 0 {
+		ident = ctl.identity(c)
+	}
 	var id int64
 	if err == nil {
-		id, err = ctl.Store.CreateThread(c.Context(), board.ID, middleware.CurrentUser(c).ID, draft.Title, draft.Body, rules.MaxThreads, tagIDs)
+		id, err = ctl.Store.CreateThread(c.Context(), board.ID, userID, ident, draft.Title, draft.Body, rules.MaxThreads, tagIDs)
 	}
 	if errors.Is(err, models.ErrBadTitle) || errors.Is(err, models.ErrBadBody) || errors.Is(err, models.ErrUnknownTag) || errors.Is(err, models.ErrTooManyTag) {
 		p := ctl.page(c, "/"+board.Slug+"/")
@@ -55,6 +86,10 @@ func (ctl *Controller) CreateThread(c fiber.Ctx) error {
 	}
 	if err != nil {
 		return err
+	}
+	if userID == 0 {
+		ctl.Guards.AnonThreads.Allow(clientKey(c))
+		ctl.Guards.AnonPosts.Allow(clientKey(c))
 	}
 	return c.Redirect().To(fmt.Sprintf("/t/%d", id))
 }
@@ -74,9 +109,11 @@ func (ctl *Controller) renderBoard(c fiber.Ctx, status int, p templates.Page, bo
 	if err != nil {
 		return err
 	}
-	picker, err := ctl.tagPicker(c, draft.Tags)
-	if err != nil {
-		return err
+	var picker templates.TagPicker
+	if !ctl.Config.Textboard() {
+		if picker, err = ctl.tagPicker(c, draft.Tags); err != nil {
+			return err
+		}
 	}
 	return render(c, status, templates.BoardPage(p, templates.BoardIndex{
 		Board:        board,
@@ -86,6 +123,8 @@ func (ctl *Controller) renderBoard(c fiber.Ctx, status int, p templates.Page, bo
 		PostsPerPage: ctl.Config.Pagination.Posts,
 		Draft:        draft,
 		Picker:       picker,
+		Guard:        ctl.postGuard(c),
+		Identity:     ctl.identityView(c, rules.AnonName),
 	}))
 }
 
@@ -108,39 +147,56 @@ func (ctl *Controller) Archive(c fiber.Ctx) error {
 }
 
 func (ctl *Controller) Thread(c fiber.Ctx) error {
-	return ctl.renderThread(c, fiber.StatusOK, "", "", false)
+	return ctl.renderThread(c, fiber.StatusOK, "", "", false, false)
 }
 
 func (ctl *Controller) Reply(c fiber.Ctx) error {
 	id := fiber.Params[int64](c, "id")
-	body, sage := c.FormValue("body"), c.FormValue("sage") == "1"
+	body, sage, staff := c.FormValue("body"), c.FormValue("sage") == "1", c.FormValue("staff") == "1"
 	thread, err := ctl.Store.ThreadByID(c.Context(), id)
 	if err != nil {
 		return err
 	}
 	rules := ctl.Config.Boards.For(thread.BoardSlug)
-	if err := cooldownError(ctl.Store.PostCooldown(c.Context(), middleware.CurrentUser(c).ID, time.Duration(ctl.Config.Cooldowns.PostSeconds)*time.Second)); err != nil {
+	if g := ctl.postGate(c); g != nil {
+		return ctl.renderThread(c, g.status, g.msg, body, sage, staff)
+	}
+	var userID int64
+	if me := ctl.poster(c); me != nil {
+		userID = me.ID
+		if err := cooldownError(ctl.Store.PostCooldown(c.Context(), me.ID, time.Duration(ctl.Config.Cooldowns.PostSeconds)*time.Second)); err != nil {
+			return err
+		}
+	} else if err := anonCooldown(c, ctl.Guards.AnonPosts, "post"); err != nil {
 		return err
 	}
-	no, err := ctl.Store.CreateReply(c.Context(), id, middleware.CurrentUser(c).ID, body, models.ReplyOptions{
+	var ident models.Identity
+	if userID == 0 {
+		ident = ctl.identity(c)
+	}
+	no, err := ctl.Store.CreateReply(c.Context(), id, userID, body, models.ReplyOptions{
 		Sage:      sage,
 		BumpLimit: rules.BumpLimit,
 		PostLimit: rules.PostLimit,
 		Refs:      markup.PostRefs(body),
+		Identity:  ident,
 	})
 	switch {
 	case errors.Is(err, models.ErrBadBody):
-		return ctl.renderThread(c, fiber.StatusUnprocessableEntity, err.Error(), body, sage)
+		return ctl.renderThread(c, fiber.StatusUnprocessableEntity, err.Error(), body, sage, staff)
 	case errors.Is(err, models.ErrThreadFull), errors.Is(err, models.ErrThreadArchived), errors.Is(err, models.ErrThreadLocked):
-		return ctl.renderThread(c, fiber.StatusConflict, err.Error(), body, sage)
+		return ctl.renderThread(c, fiber.StatusConflict, err.Error(), body, sage, staff)
 	case err != nil:
 		return err
+	}
+	if userID == 0 {
+		ctl.Guards.AnonPosts.Allow(clientKey(c))
 	}
 	per := ctl.Config.Pagination.Posts
 	return c.Redirect().To(templates.PostURL(id, models.PageOf(no, per), no))
 }
 
-func (ctl *Controller) renderThread(c fiber.Ctx, status int, errMsg, draft string, sage bool) error {
+func (ctl *Controller) renderThread(c fiber.Ctx, status int, errMsg, draft string, sage, staff bool) error {
 	thread, err := ctl.Store.ThreadByID(c.Context(), fiber.Params[int64](c, "id"))
 	if err != nil {
 		return err
@@ -168,14 +224,18 @@ func (ctl *Controller) renderThread(c fiber.Ctx, status int, errMsg, draft strin
 
 	p := ctl.page(c, thread.Title)
 	p.Error = errMsg
+	rules := ctl.Config.Boards.For(thread.BoardSlug)
 	return render(c, status, templates.ThreadPage(p, templates.ThreadView{
 		Thread:       thread,
 		Posts:        posts,
 		Backlinks:    backlinks,
 		Pager:        pg,
-		Rules:        ctl.Config.Boards.For(thread.BoardSlug),
+		Rules:        rules,
 		PostsPerPage: per,
 		Draft:        draft,
 		Sage:         sage,
+		Staff:        staff,
+		Guard:        ctl.postGuard(c),
+		Identity:     ctl.identityView(c, rules.AnonName),
 	}))
 }

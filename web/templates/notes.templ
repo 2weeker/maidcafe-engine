@@ -34,7 +34,7 @@ templ noteList(p Page, items []models.FeedItem, empty string) {
 }
 
 templ tagChips(tags []string) {
-	if len(tags) > 0 {
+	if len(tags) > 0 && !Site.Textboard {
 		<ul class="tags">
 			for _, t := range tags {
 				<li><a href={ templ.URL(TagURL(t)) } class="tagchip">#{ t }</a></li>

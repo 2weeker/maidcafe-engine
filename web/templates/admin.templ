@@ -24,10 +24,14 @@ templ AdminHome(p Page, st models.AdminStats, log []models.ModAction) {
 			@stat("mods + admins", st.Mods, "/admin/users")
 			@stat("banned", st.Banned, "/admin/users")
 			@stat("pending deletion", st.PendingDeletion, "/admin/users")
-			@stat("notes", st.Notes, "/")
+			if !Site.Textboard {
+				@stat("notes", st.Notes, "/")
+			}
 			@stat("threads", st.Threads, "/boards")
 			@stat("posts", st.Posts, "/boards")
-			@stat("tags", st.Tags, "/tags")
+			if !Site.Textboard {
+				@stat("tags", st.Tags, "/tags")
+			}
 		</div>
 		@sectionHead("recent actions")
 		@logTable(log)
@@ -57,7 +61,7 @@ templ logTable(log []models.ModAction) {
 						<td>
 							if len(a.Target) > 0 && a.Target[0] == '/' {
 								<a href={ templ.URL(a.Target) }>{ a.Target }</a>
-							} else if len(a.Target) > 0 && a.Target[0] == '~' {
+							} else if len(a.Target) > 0 && a.Target[0] == '~' && !Site.Textboard {
 								<a href={ templ.URL(userURL(a.Target[1:])) }>{ a.Target }</a>
 							} else {
 								{ a.Target }
@@ -84,6 +88,27 @@ templ AdminUsers(p Page, v AdminUsersView) {
 	@Layout(p) {
 		<h1 class="huge">users</h1>
 		@adminNav(p, "users")
+		if p.User.IsAdmin() {
+			<details class="box new-thread" open?={ v.NewName != "" || p.Error != "" }>
+				<summary>[ new account ]</summary>
+				<form method="post" action="/admin/users" class="compose">
+					@csrfField(p)
+					<div class="board-form">
+						<label>username <input type="text" name="username" value={ v.NewName } maxlength="20" pattern="[a-zA-Z0-9_]{3,20}" required autocomplete="off"/></label>
+						<label>password <input type="password" name="password" minlength="8" maxlength="72" required autocomplete="new-password"/></label>
+						<label>
+							role
+							<select name="role">
+								<option value="user" selected?={ v.NewRole != models.RoleMod }>user</option>
+								<option value="mod" selected?={ v.NewRole == models.RoleMod }>mod</option>
+							</select>
+						</label>
+					</div>
+					<p class="hint">3-20 chars, a-z 0-9 _. tell them the password out of band; there is no reset. admins are named in config.yaml.</p>
+					<div class="row-end"><button type="submit">create account</button></div>
+				</form>
+			</details>
+		}
 		<form method="get" action="/admin/users" class="box compose admin-search">
 			<label for="admin-q">find</label>
 			<div class="row-between">
@@ -99,7 +124,15 @@ templ AdminUsers(p Page, v AdminUsersView) {
 				<tbody>
 					for _, u := range v.Users {
 						<tr>
-							<td><a href={ templ.URL(userURL(u.Username)) } class="author">~{ u.Username }</a><br/><span class="muted small">joined { stamp(u.CreatedAt) }</span></td>
+							<td>
+								if Site.Textboard {
+									<span class="author">~{ u.Username }</span>
+								} else {
+									<a href={ templ.URL(userURL(u.Username)) } class="author">~{ u.Username }</a>
+								}
+								<br/>
+								<span class="muted small">joined { stamp(u.CreatedAt) }</span>
+							</td>
 							<td>
 								if u.Role == models.RoleAdmin {
 									<span class="tag">admin</span>
@@ -119,7 +152,13 @@ templ AdminUsers(p Page, v AdminUsersView) {
 									<span class="tag">{ u.Role }</span>
 								}
 							</td>
-							<td class="small">{ plural(u.Notes, "note") }, { plural(u.Posts, "post") }</td>
+							<td class="small">
+								if Site.Textboard {
+									{ plural(u.Posts, "post") }
+								} else {
+									{ plural(u.Notes, "note") }, { plural(u.Posts, "post") }
+								}
+							</td>
 							<td class="small">
 								if u.BannedAt != nil {
 									<span class="tag">banned</span> <span class="muted">{ u.BanReason }</span>

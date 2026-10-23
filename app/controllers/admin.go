@@ -41,6 +41,29 @@ func (ctl *Controller) AdminUsers(c fiber.Ctx) error {
 	return render(c, fiber.StatusOK, templates.AdminUsers(ctl.page(c, "admin :: users"), templates.AdminUsersView{Users: users, Query: q, Pager: pg}))
 }
 
+func (ctl *Controller) CreateAccount(c fiber.Ctx) error {
+	username, role := c.FormValue("username"), c.FormValue("role")
+	if role != models.RoleUser && role != models.RoleMod {
+		return fiber.NewError(fiber.StatusBadRequest, models.ErrBadRole.Error())
+	}
+	u, err := ctl.Store.CreateUser(c.Context(), username, c.FormValue("password"))
+	if errors.Is(err, models.ErrBadUsername) || errors.Is(err, models.ErrBadPassword) || errors.Is(err, models.ErrUsernameTaken) {
+		p := ctl.page(c, "admin :: users")
+		p.Error = err.Error()
+		return render(c, fiber.StatusUnprocessableEntity, templates.AdminUsers(p, templates.AdminUsersView{NewName: username, NewRole: role}))
+	}
+	if err != nil {
+		return err
+	}
+	if role == models.RoleMod {
+		if err := ctl.Store.SetRole(c.Context(), u.ID, role); err != nil {
+			return err
+		}
+	}
+	ctl.Store.Log(c.Context(), middleware.CurrentUser(c).ID, "create account", "~"+u.Username, role)
+	return c.Redirect().To("/admin/users?q=" + url.QueryEscape(u.Username))
+}
+
 func (ctl *Controller) adminBack(c fiber.Ctx) string {
 	if q := c.FormValue("q"); q != "" {
 		return "/admin/users?q=" + url.QueryEscape(q)
@@ -232,6 +255,6 @@ func (ctl *Controller) DeleteThread(c fiber.Ctx) error {
 		return err
 	}
 	ctl.Store.Log(c.Context(), middleware.CurrentUser(c).ID, "delete thread", fmt.Sprintf("/b/%s", thread.BoardSlug),
-		fmt.Sprintf("%q by ~%s, %d posts", thread.Title, thread.Author, thread.Posts()))
+		fmt.Sprintf("%q by %s, %d posts", thread.Title, templates.AuthorName(thread.Author, thread.Name, thread.Trip), thread.Posts()))
 	return c.Redirect().To("/b/" + thread.BoardSlug)
 }

@@ -13,6 +13,8 @@ the detailed docs.
 | [features/accounts.md](features/accounts.md) | Email-free registration, sessions, logout |
 | [features/captcha-and-rate-limits.md](features/captcha-and-rate-limits.md) | Login/register captcha, honeypot, lockouts, request and signup rate limits, closing registration |
 | [features/about.md](features/about.md) | The configurable about page |
+| [features/textboard-mode.md](features/textboard-mode.md) | `mode: textboard`: anonymous boards only, staff accounts, capcodes |
+| [features/tripcodes.md](features/tripcodes.md) | Names and classic 2channel / futaba tripcodes, set once on `/name`; per-board default names |
 | [features/notes.md](features/notes.md) | The microblog: notes, likes, reposts, replies, tags, sorting |
 | [features/boards.md](features/boards.md) | The textboard: boards, threads, `>>N`, sage, limits, archive |
 | [features/formatting.md](features/formatting.md) | The markdown subset, quoting rules, greentext, spoilers, `[aa]` art blocks |

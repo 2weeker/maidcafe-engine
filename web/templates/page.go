@@ -27,6 +27,7 @@ type ThreadDraft struct {
 	Title string
 	Body  string
 	Tags  []string
+	Staff bool
 }
 
 type TagPicker struct {

@@ -16,6 +16,8 @@ type BoardIndex struct {
 	PostsPerPage int
 	Draft        ThreadDraft
 	Picker       TagPicker
+	Guard        AuthForm
+	Identity     IdentityView
 }
 
 type ThreadView struct {
@@ -27,6 +29,9 @@ type ThreadView struct {
 	PostsPerPage int
 	Draft        string
 	Sage         bool
+	Staff        bool
+	Guard        AuthForm
+	Identity     IdentityView
 }
 
 func (v ThreadView) Locked() bool {

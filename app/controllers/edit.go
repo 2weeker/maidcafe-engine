@@ -63,7 +63,7 @@ func (ctl *Controller) EditPost(c fiber.Ctx) error {
 		return err
 	}
 	if me := middleware.CurrentUser(c); me.ID != post.AuthorID {
-		ctl.Store.Log(c.Context(), me.ID, "edit post", fmt.Sprintf("/t/%d#p%d", thread.ID, post.No), "by ~"+post.Author)
+		ctl.Store.Log(c.Context(), me.ID, "edit post", fmt.Sprintf("/t/%d#p%d", thread.ID, post.No), "by "+templates.AuthorName(post.Author, post.Name, post.Trip))
 	}
 	return c.Redirect().To(templates.PostURL(thread.ID, models.PageOf(post.No, ctl.Config.Pagination.Posts), post.No))
 }
@@ -100,7 +100,7 @@ func (ctl *Controller) DeletePost(c fiber.Ctx) error {
 		return err
 	}
 	if byMod {
-		ctl.Store.Log(c.Context(), me.ID, "remove post", fmt.Sprintf("/t/%d#p%d", thread.ID, post.No), "by ~"+post.Author)
+		ctl.Store.Log(c.Context(), me.ID, "remove post", fmt.Sprintf("/t/%d#p%d", thread.ID, post.No), "by "+templates.AuthorName(post.Author, post.Name, post.Trip))
 	}
 	return c.Redirect().To(templates.PostURL(thread.ID, models.PageOf(post.No, ctl.Config.Pagination.Posts), post.No))
 }
@@ -113,7 +113,7 @@ func (ctl *Controller) RestorePost(c fiber.Ctx) error {
 	if err := ctl.Store.RestorePost(c.Context(), post.ID); err != nil {
 		return err
 	}
-	ctl.Store.Log(c.Context(), middleware.CurrentUser(c).ID, "restore post", fmt.Sprintf("/t/%d#p%d", thread.ID, post.No), "by ~"+post.Author)
+	ctl.Store.Log(c.Context(), middleware.CurrentUser(c).ID, "restore post", fmt.Sprintf("/t/%d#p%d", thread.ID, post.No), "by "+templates.AuthorName(post.Author, post.Name, post.Trip))
 	return c.Redirect().To(templates.PostURL(thread.ID, models.PageOf(post.No, ctl.Config.Pagination.Posts), post.No))
 }
 

@@ -24,7 +24,7 @@ app/
   middleware/              session lookup (LoadUser), role guards, request rate limit
   captcha/                 captcha store (issue, verify, expire); captchaimg/ draws the PNG
   limits/                  token-bucket rate limits, failure lockouts, address keys
-  routes/                  the URL table
+  routes/                  the URL table (shared routes, plus a cafe or textboard set by mode)
 web/
   templates/               V: *.templ views + small Go helpers (URLs, view structs)
   markup/                  user text -> safe HTML (restricted markdown, >>N, [aa])
@@ -58,7 +58,9 @@ types) and config (for board rules) but never query the database.
    `/static/*` (served from the embedded filesystem with a 1 hour cache), `LoadUser` (resolve the
    session cookie into a user), `csrf` (validate POSTs).
 2. **Route** dispatches to a controller method. Routes that change data for a user are wrapped
-   in `RequireUser`, which redirects anonymous visitors to `/login`.
+   in `RequireUser`, which redirects anonymous visitors to `/login`. `routes.Register` mounts
+   the shared table plus either the cafe set (notes, profiles, tags, registration) or the
+   textboard set (anonymous board posting) depending on `mode`.
 3. **Controller** reads params and form values, calls `Store` methods, and either redirects
    (after a successful POST, the Post/Redirect/Get pattern) or renders a page.
 4. **Validation errors** (empty post, bad username…) re-render the same page with a `422` or

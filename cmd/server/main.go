@@ -2,7 +2,9 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"log"
+	"os"
 	"os/signal"
 	"syscall"
 	"time"
@@ -44,10 +46,23 @@ func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 
+	if len(os.Args) > 1 {
+		if os.Args[1] != "adduser" {
+			fmt.Fprintln(os.Stderr, "usage: maidcafe [adduser <username> [user|mod]]")
+			os.Exit(2)
+		}
+		if err := addUser(ctx, os.Args[2:]); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
+		return
+	}
+
 	cfg, err := config.Load()
 	if err != nil {
 		log.Fatal(err)
 	}
+	log.Printf("mode: %s", cfg.Mode)
 
 	pool, err := database.Connect(ctx, cfg.Database.URL)
 	if err != nil {

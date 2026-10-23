@@ -5,27 +5,32 @@ redirects anonymous visitors to `/login`; "guest" means the route is for logged-
 and sends logged-in users to their profile. Successful POSTs redirect (303) back to a page; failed
 validation re-renders the form with the input kept.
 
+In [textboard mode](features/textboard-mode.md) the routes marked **cafe** aren't registered
+(404), `/` serves the boards list, and the two board posting routes take no login: anyone may
+post, and a logged-in mod or admin may add `staff=1` to sign the post.
+
 ## Pages
 
 | Method | Path | Login | Page |
 | --- | --- | --- | --- |
-| GET | `/` | | Home: note composer with tag pickers, `recent`/`top`/`following` notes, boards + users + tags sidebar. `?sort=`, `?page=N`. Logged out: `guests.notes` notes, `guests.boards` boards, no users/tags panels, no paging |
-| GET | `/n/:id` | | A note: its parent (if a reply), the note, reply box, replies. `?page=N` |
-| GET | `/u/:name` | | Profile: art, bio, follow button, counts, notes + reposts + replies. `?sort=top`, `?page=N` |
-| GET | `/u/:name/followers`, `/u/:name/following` | yes | Follower / following lists. `?page=N` |
-| GET | `/users` | yes | All users (`newest`, `name`) or the people you follow (`followed`). `?sort=`, `?page=N` |
-| GET | `/tags` | yes | All tags + create form. `?sort=popular|newest|name`, `?page=N` |
-| GET | `/tags/:name` | yes | A tag's notes (`?sort=`) or threads (`?show=threads`). `?page=N` |
-| GET | `/search` | | `?q=`, `?in=all|notes|threads|users|tags`, `?page=N`. Logged out: only `all`, `notes`, `threads`, and `all` skips users and tags |
+| GET | `/` | | cafe: Home: note composer with tag pickers, `recent`/`top`/`following` notes, boards + users + tags sidebar. `?sort=`, `?page=N`. Logged out: `guests.notes` notes, `guests.boards` boards, no users/tags panels, no paging |
+| GET | `/n/:id` | cafe | A note: its parent (if a reply), the note, reply box, replies. `?page=N` |
+| GET | `/u/:name` | cafe | Profile: art, bio, follow button, counts, notes + reposts + replies. `?sort=top`, `?page=N` |
+| GET | `/u/:name/followers`, `/u/:name/following` | yes, cafe | Follower / following lists. `?page=N` |
+| GET | `/users` | yes, cafe | All users (`newest`, `name`) or the people you follow (`followed`). `?sort=`, `?page=N` |
+| GET | `/tags` | yes, cafe | All tags + create form. `?sort=popular|newest|name`, `?page=N` |
+| GET | `/tags/:name` | yes, cafe | A tag's notes (`?sort=`) or threads (`?show=threads`). `?page=N` |
+| GET | `/search` | | `?q=`, `?in=all|notes|threads|users|tags`, `?page=N`. Logged out: only `all`, `notes`, `threads`, and `all` skips users and tags. Textboard: always `threads` |
 | GET | `/boards` | | Every board with live/archived thread counts, post count and last activity |
+| GET | `/name` | textboard | Set or clear a name and tripcode key, kept in a cookie ([tripcodes.md](features/tripcodes.md)) |
 | GET | `/b/:slug` | | Board index: subject list, thread previews, new-thread form. `?page=N` |
 | GET | `/b/:slug/archive` | | Archived threads of a board. `?page=N` |
 | GET | `/t/:id` | | Thread. `?page=N`, `?quote=N` prefills the reply box with `>>N` |
-| GET | `/login`, `/register` | guest | Auth forms, with a captcha when enabled. Logged-in users are redirected to their profile. `/register` shows the closed message when registration is off |
+| GET | `/login`, `/register` | guest | Auth forms, with a captcha when enabled. Logged-in users are redirected to their profile. `/register` shows the closed message when registration is off, and is a 404 in textboard mode |
 | GET | `/captcha/:id.png` | | A captcha image; only for the address it was issued to, 404 once used or expired |
 | GET | `/about` | | The about page from `config.yaml`; 404 when disabled |
-| GET | `/settings` | yes | Edit bio and text art |
-| GET | `/t/:id/p/:no/edit`, `/n/:id/edit` | yes | Edit your own post / note (mods: anyone's) |
+| GET | `/settings` | yes | Edit bio and text art, delete the account (textboard: deletion only) |
+| GET | `/t/:id/p/:no/edit`, `/n/:id/edit` | yes | Edit your own post / note (mods: anyone's; `/n/` is cafe only) |
 | GET | `/t/:id/p/:no/delete`, `/n/:id/delete`, `/t/:id/delete` | yes | Confirmation pages for deleting a post / note / thread (thread: mods) |
 | GET | `/admin` | mod | Dashboard |
 | GET | `/admin/users` | mod | User management. `?q=`, `?page=N` |
@@ -38,21 +43,22 @@ validation re-renders the form with the input kept.
 
 | Method | Path | Login | Fields | Effect |
 | --- | --- | --- | --- | --- |
-| POST | `/register` | guest | `username`, `password`, `password_confirm`, `captcha_id`, `captcha_value`, `website` (must be empty) | Create account, log in, go to profile. `403` when registration is closed, `422` wrong captcha, `429` locked out or rate limited |
+| POST | `/register` | guest, cafe | `username`, `password`, `password_confirm`, `captcha_id`, `captcha_value`, `website` (must be empty) | Create account, log in, go to profile. `403` when registration is closed, `422` wrong captcha, `429` locked out or rate limited |
 | POST | `/login` | guest | `username`, `password`, `captcha_id`, `captcha_value`, `website` (must be empty) | Start a session. `422` wrong captcha, `429` locked out or rate limited |
 | POST | `/logout` | | | End the session |
 | POST | `/theme` | | `theme` (`light`/`eyesaver`/`dark`), `next` | Set the theme cookie, return to `next` |
-| POST | `/notes` | yes | `body`, `tag1`…`tagN` | Post a note with up to N tags |
-| POST | `/u/:name/follow` | yes | `on` (`1`/`0`), `next` | Follow or unfollow |
-| POST | `/tags` | yes | `name` | Create a tag |
-| POST | `/n/:id/reply` | yes | `body` | Reply to a note |
-| POST | `/n/:id/like` | yes | `on` (`1`/`0`), `next` | Like or unlike |
-| POST | `/n/:id/repost` | yes | `on` (`1`/`0`), `next` | Repost or un-repost |
-| POST | `/settings` | yes | `bio`, `art`, `action` (`preview`/`save`) | Preview or save the profile |
+| POST | `/notes` | yes, cafe | `body`, `tag1`…`tagN` | Post a note with up to N tags |
+| POST | `/u/:name/follow` | yes, cafe | `on` (`1`/`0`), `next` | Follow or unfollow |
+| POST | `/tags` | yes, cafe | `name` | Create a tag |
+| POST | `/n/:id/reply` | yes, cafe | `body` | Reply to a note |
+| POST | `/n/:id/like` | yes, cafe | `on` (`1`/`0`), `next` | Like or unlike |
+| POST | `/n/:id/repost` | yes, cafe | `on` (`1`/`0`), `next` | Repost or un-repost |
+| POST | `/settings` | yes, cafe | `bio`, `art`, `action` (`preview`/`save`) | Preview or save the profile |
 | POST | `/settings/delete` | yes | `password` | Schedule account deletion after the grace window |
 | POST | `/settings/undelete` | yes | `next` | Cancel a scheduled deletion |
-| POST | `/b/:slug` | yes | `title`, `body`, `tag1`…`tagN` | Start a thread with up to N tags |
-| POST | `/t/:id` | yes | `body`, `sage` (`1`) | Reply in a thread |
+| POST | `/b/:slug` | yes (textboard: no) | `title`, `body`, `website` (must be empty), `tag1`…`tagN` (cafe), `staff` (`1`, textboard), `captcha_id` + `captcha_value` (textboard, logged out) | Start a thread. `422` wrong captcha, `429` locked out, `400` honeypot |
+| POST | `/t/:id` | yes (textboard: no) | `body`, `sage` (`1`), `website` (must be empty), `staff` (`1`, textboard), `captcha_id` + `captcha_value` (textboard, logged out) | Reply in a thread. Same error codes |
+| POST | `/name` | textboard | `name`, `key`, `action` (`save`/`clear`) | Save the identity cookie, or delete it. `422` for a name without a key |
 | POST | `/t/:id/p/:no/edit`, `/n/:id/edit` | yes | `body` | Save an edit |
 | POST | `/t/:id/p/:no/delete`, `/n/:id/delete` | yes | | Delete (post → `[deleted]`, note → removed) |
 | POST | `/t/:id/p/:no/restore` | mod | | Restore a removed post |
@@ -60,6 +66,7 @@ validation re-renders the form with the input kept.
 | POST | `/t/:id/delete` | mod | | Delete a thread |
 | POST | `/u/:name/ban`, `/u/:name/unban` | mod | `reason`, `next` | Ban / unban |
 | POST | `/u/:name/role` | admin | `role` (`user`/`mod`), `q` | Change role |
+| POST | `/admin/users` | admin | `username`, `password`, `role` (`user`/`mod`) | Create an account; `422` on a bad name or password or a taken name |
 | POST | `/admin/boards` | admin | `slug`, `name`, `description`, `position` | Create a board |
 | POST | `/admin/boards/:slug` | admin | `name`, `description`, `position`, `action` (`delete`) | Edit or delete a board |
 

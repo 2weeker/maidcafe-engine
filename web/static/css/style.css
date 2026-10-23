@@ -826,6 +826,31 @@ button.danger-btn:hover { background: var(--ink); color: var(--paper); }
 .footer pre { overflow-x: auto; max-width: 100%; }
 .footer-link { font-family: var(--mono); font-weight: 700; text-decoration: none; color: var(--dim); }
 
+.author.anon {
+  font-weight: 700;
+}
+.trip {
+  font-weight: 400;
+  color: var(--green);
+}
+.posting-as {
+  margin: 0 0 8px;
+  font-size: 0.9em;
+}
+.posting-as .act {
+  margin-left: 6px;
+}
+.capcode {
+  color: var(--green);
+  font-weight: 700;
+  margin-left: 4px;
+}
+.checks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+  align-items: center;
+}
 .form-trap {
   position: absolute;
   left: -10000px;

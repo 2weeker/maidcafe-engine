@@ -33,6 +33,7 @@ type Purpose string
 const (
 	Login    Purpose = "login"
 	Register Purpose = "register"
+	Post     Purpose = "post"
 )
 
 type Binding struct {

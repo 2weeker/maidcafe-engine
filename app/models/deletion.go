@@ -30,6 +30,10 @@ func (s *Store) CancelDeletion(ctx context.Context, userID int64) error {
 func (s *Store) PurgeDeletedAccounts(ctx context.Context) ([]string, error) {
 	var names []string
 	err := pgx.BeginFunc(ctx, s.DB, func(tx pgx.Tx) error {
+		if _, err := tx.Exec(ctx, `UPDATE posts SET deleted_at = now() WHERE deleted_at IS NULL
+			AND user_id IN (SELECT id FROM users WHERE delete_at IS NOT NULL AND delete_at <= now())`); err != nil {
+			return err
+		}
 		rows, err := tx.Query(ctx, `DELETE FROM users WHERE delete_at IS NOT NULL AND delete_at <= now() RETURNING username`)
 		if err != nil {
 			return err

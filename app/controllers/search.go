@@ -28,6 +28,8 @@ func (ctl *Controller) Search(c fiber.Ctx) error {
 	p := ctl.page(c, "Search")
 
 	switch {
+	case ctl.Config.Textboard():
+		scope = "threads"
 	case strings.HasPrefix(q, "#"):
 		if tag, err := ctl.Store.TagByName(ctx, q); err == nil {
 			return c.Redirect().To(templates.TagURL(tag.Name))
@@ -47,7 +49,7 @@ func (ctl *Controller) Search(c fiber.Ctx) error {
 		scope = "all"
 	}
 	p.Query, p.Scope = q, scope
-	v := templates.SearchView{Query: q, Scope: scope, PostsPerPage: ctl.Config.Pagination.Posts}
+	v := templates.SearchView{Query: q, Scope: scope, PostsPerPage: ctl.Config.Pagination.Posts, AnonName: ctl.anonName}
 	if q == "" {
 		return render(c, fiber.StatusOK, templates.SearchPage(p, v))
 	}

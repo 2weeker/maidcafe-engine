@@ -31,7 +31,7 @@ templ EditPost(p Page, t models.Thread, post models.Post, body string) {
 			@csrfField(p)
 			<h1 class="huge">edit #{ itoa(post.No) }</h1>
 			if post.Author != p.User.Username {
-				<p class="muted small">editing ~{ post.Author }'s post as a moderator. this is logged.</p>
+				<p class="muted small">editing a post by { AuthorName(post.Author, post.Name, post.Trip) } as a moderator. this is logged.</p>
 			}
 			<textarea name="body" rows="10" maxlength="4000" required>{ body }</textarea>
 			@formatHint()

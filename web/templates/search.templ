@@ -12,18 +12,24 @@ templ searchBody(p Page, v SearchView) {
 	<div class="search-results">
 		if v.Query == "" {
 			<h1 class="huge">search</h1>
-			<p class="muted">type something in the bar above. <code>#tag</code> jumps to a tag, <code>~user</code> to a profile. quotes for exact phrases, <code>-word</code> to exclude.</p>
+			if Site.Textboard {
+				<p class="muted">type something in the bar above to search thread titles and posts. quotes for exact phrases, <code>-word</code> to exclude.</p>
+			} else {
+				<p class="muted">type something in the bar above. <code>#tag</code> jumps to a tag, <code>~user</code> to a profile. quotes for exact phrases, <code>-word</code> to exclude.</p>
+			}
 		} else {
 			<h1 class="huge">results <span class="thin">:: <q>{ v.Query }</q></span></h1>
-			<nav class="tabs" aria-label="scope">
-				for _, s := range SearchScopes(p.User != nil) {
-					if s == v.Scope {
-						<span class="tab on" aria-current="page">{ scopeLabel(s) }</span>
-					} else {
-						<a class="tab" href={ templ.URL(searchURL(v.Query, s)) }>{ scopeLabel(s) }</a>
+			if len(SearchScopes(p.User != nil)) > 1 {
+				<nav class="tabs" aria-label="scope">
+					for _, s := range SearchScopes(p.User != nil) {
+						if s == v.Scope {
+							<span class="tab on" aria-current="page">{ scopeLabel(s) }</span>
+						} else {
+							<a class="tab" href={ templ.URL(searchURL(v.Query, s)) }>{ scopeLabel(s) }</a>
+						}
 					}
-				}
-			</nav>
+				</nav>
+			}
 			if v.Empty() {
 				<p class="muted">-- nothing found. --</p>
 			}
@@ -43,7 +49,7 @@ templ searchBody(p Page, v SearchView) {
 					<article class="box post">
 						<header class="meta">
 							<a href={ templ.URL(PostURL(sp.ThreadID, models.PageOf(sp.No, v.PostsPerPage), sp.No)) } class="post-no">#{ itoa(sp.No) }</a>
-							<a href={ templ.URL(userURL(sp.Author)) } class="author">~{ sp.Author }</a>
+							@authorLink(sp.Author, sp.AuthorRole, sp.Name, sp.Trip, v.AnonName(sp.BoardSlug))
 							<span class="muted">in <a href={ templ.URL(threadURL(sp.ThreadID)) }>{ sp.ThreadTitle }</a> on <a href={ templ.URL(boardURL(sp.BoardSlug)) }>/{ sp.BoardSlug }/</a></span>
 							<time>{ stamp(sp.CreatedAt) }</time>
 						</header>

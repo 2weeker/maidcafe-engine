@@ -1,7 +1,7 @@
 COMPOSE := docker compose
 
 .DEFAULT_GOAL := help
-.PHONY: help up down build rebuild restart logs ps psql generate fmt vet clean
+.PHONY: help up down build rebuild restart logs ps psql adduser generate fmt vet clean
 
 help: ## list targets
 	@grep -E '^[a-z]+:.*## ' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  %-10s %s\n", $$1, $$2}'
@@ -29,6 +29,9 @@ ps: ## show container status
 
 psql: ## open a psql shell on the database
 	$(COMPOSE) exec db sh -c 'psql -U "$$POSTGRES_USER" -d "$$POSTGRES_DB"'
+
+adduser: ## create an account: make adduser NAME=alice [ROLE=mod] (asks for the password)
+	$(COMPOSE) run --rm --no-deps app adduser $(NAME) $(ROLE)
 
 generate: ## regenerate templ files locally (for editor support)
 	go tool templ generate

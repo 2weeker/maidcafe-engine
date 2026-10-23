@@ -1,0 +1,35 @@
+package templates
+
+templ NamePage(p Page, v NameView) {
+	@Layout(p) {
+		<h1 class="huge">name <span class="thin">&amp; tripcode</span></h1>
+		<p class="box muted">
+			you currently post as <b>{ v.Identity.Shown() }</b>
+			if v.Identity.Trip == "" {
+				on most boards.
+				for _, bn := range v.BoardNames {
+					on /{ bn[0] }/ it's <b>{ bn[1] }</b>.
+				}
+			} else {
+				on every board.
+			}
+		</p>
+		<form method="post" action="/name" class="box compose">
+			@csrfField(p)
+			<label for="name">name <span class="muted">(optional, up to 30 characters)</span></label>
+			<input id="name" type="text" name="name" value={ v.Draft } maxlength="60" autocomplete="off"/>
+			<label for="key">tripcode key <span class="muted">(a secret; the first 8 characters count)</span></label>
+			<input id="key" type="password" name="key" maxlength="72" autocomplete="off"/>
+			<p class="hint">
+				a name is only shown together with a tripcode, so nobody can post under your name without your key.
+				the key becomes a ten-character code after it, like <b>{ "nanashi ◆WokonZwxw2" }</b>: the classic 2channel / futaba
+				tripcode, so a key you used elsewhere gives the same code here. without a key you post as the board's default name.
+				this is remembered in a cookie on this browser for a year.
+			</p>
+			<div class="row-end gap">
+				<button type="submit" name="action" value="clear" class="secondary">clear</button>
+				<button type="submit" name="action" value="save">save</button>
+			</div>
+		</form>
+	}
+}

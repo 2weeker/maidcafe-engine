@@ -9,6 +9,25 @@ import (
 
 func Register(app *fiber.App, ctl *controllers.Controller) {
 	app.Get("/", ctl.Home)
+	if ctl.Config.Textboard() {
+		textboard(app, ctl)
+	} else {
+		cafe(app, ctl)
+	}
+	shared(app, ctl)
+}
+
+func textboard(app *fiber.App, ctl *controllers.Controller) {
+	app.Get("/name", ctl.NameForm)
+	app.Post("/name", ctl.SetName)
+	app.Post("/b/:slug", middleware.AllowAnon, ctl.CreateThread)
+	app.Post("/t/:id<int>", middleware.AllowAnon, ctl.Reply)
+}
+
+func cafe(app *fiber.App, ctl *controllers.Controller) {
+	app.Post("/b/:slug", middleware.RequirePoster, ctl.CreateThread)
+	app.Post("/t/:id<int>", middleware.RequirePoster, ctl.Reply)
+
 	app.Post("/notes", middleware.RequirePoster, ctl.CreateNote)
 	app.Get("/n/:id<int>", ctl.Note)
 	app.Post("/n/:id<int>/reply", middleware.RequirePoster, ctl.ReplyNote)
@@ -21,6 +40,19 @@ func Register(app *fiber.App, ctl *controllers.Controller) {
 
 	app.Get("/register", middleware.RequireGuest, ctl.RegisterForm)
 	app.Post("/register", middleware.RequireGuest, ctl.Register)
+
+	app.Get("/u/:name", ctl.Profile)
+	app.Get("/u/:name/followers", middleware.RequireUser, ctl.Followers)
+	app.Get("/u/:name/following", middleware.RequireUser, ctl.FollowingList)
+	app.Post("/u/:name/follow", middleware.RequirePoster, ctl.Follow)
+	app.Get("/users", middleware.RequireUser, ctl.Users)
+	app.Get("/tags", middleware.RequireUser, ctl.Tags)
+	app.Post("/tags", middleware.RequirePoster, ctl.CreateTag)
+	app.Get("/tags/:name", middleware.RequireUser, ctl.TagPage)
+	app.Post("/settings", middleware.RequireUser, ctl.SaveSettings)
+}
+
+func shared(app *fiber.App, ctl *controllers.Controller) {
 	app.Get("/login", middleware.RequireGuest, ctl.LoginForm)
 	app.Post("/login", middleware.RequireGuest, ctl.Login)
 	app.Post("/logout", ctl.Logout)
@@ -28,29 +60,18 @@ func Register(app *fiber.App, ctl *controllers.Controller) {
 	app.Get("/captcha/:file", ctl.CaptchaImage)
 	app.Get("/about", ctl.About)
 
-	app.Get("/u/:name", ctl.Profile)
-	app.Get("/u/:name/followers", middleware.RequireUser, ctl.Followers)
-	app.Get("/u/:name/following", middleware.RequireUser, ctl.FollowingList)
-	app.Post("/u/:name/follow", middleware.RequirePoster, ctl.Follow)
 	app.Post("/u/:name/role", middleware.RequireAdmin, ctl.SetRole)
 	app.Post("/u/:name/ban", middleware.RequireMod, ctl.Ban)
 	app.Post("/u/:name/unban", middleware.RequireMod, ctl.Unban)
-	app.Get("/users", middleware.RequireUser, ctl.Users)
-	app.Get("/tags", middleware.RequireUser, ctl.Tags)
-	app.Post("/tags", middleware.RequirePoster, ctl.CreateTag)
-	app.Get("/tags/:name", middleware.RequireUser, ctl.TagPage)
 	app.Get("/search", ctl.Search)
 	app.Get("/settings", middleware.RequireUser, ctl.Settings)
-	app.Post("/settings", middleware.RequireUser, ctl.SaveSettings)
 	app.Post("/settings/delete", middleware.RequireUser, ctl.DeleteAccount)
 	app.Post("/settings/undelete", middleware.RequireUser, ctl.CancelDeletion)
 
 	app.Get("/boards", ctl.BoardsPage)
 	app.Get("/b/:slug", ctl.Board)
-	app.Post("/b/:slug", middleware.RequirePoster, ctl.CreateThread)
 	app.Get("/b/:slug/archive", ctl.Archive)
 	app.Get("/t/:id<int>", ctl.Thread)
-	app.Post("/t/:id<int>", middleware.RequirePoster, ctl.Reply)
 	app.Get("/t/:id<int>/p/:no<int>/edit", middleware.RequirePoster, ctl.EditPostForm)
 	app.Post("/t/:id<int>/p/:no<int>/edit", middleware.RequirePoster, ctl.EditPost)
 	app.Get("/t/:id<int>/p/:no<int>/delete", middleware.RequireUser, ctl.DeletePostForm)
@@ -63,6 +84,7 @@ func Register(app *fiber.App, ctl *controllers.Controller) {
 
 	app.Get("/admin", middleware.RequireMod, ctl.AdminHome)
 	app.Get("/admin/users", middleware.RequireMod, ctl.AdminUsers)
+	app.Post("/admin/users", middleware.RequireAdmin, ctl.CreateAccount)
 	app.Get("/admin/log", middleware.RequireMod, ctl.AdminLog)
 	app.Get("/admin/boards", middleware.RequireAdmin, ctl.AdminBoards)
 	app.Post("/admin/boards", middleware.RequireAdmin, ctl.CreateBoard)

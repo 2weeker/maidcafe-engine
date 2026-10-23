@@ -107,6 +107,8 @@ func TestInvalidConfigs(t *testing.T) {
 		"empty about title":     {"about:\n  title: \"\"\n", "about.title"},
 		"zero guest notes":      {"guests:\n  notes: 0\n", "guests.notes"},
 		"negative guest boards": {"guests:\n  boards: -1\n", "guests.boards"},
+		"unknown mode":          {"mode: forum\n", "mode must be"},
+		"empty anon name":       {"boards:\n  overrides:\n    tech:\n      anon_name: \"\"\n", "boards.overrides.tech.anon_name"},
 	}
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
@@ -115,6 +117,29 @@ func TestInvalidConfigs(t *testing.T) {
 				t.Fatalf("want error containing %q, got %v", tt.want, err)
 			}
 		})
+	}
+}
+
+func TestAnonName(t *testing.T) {
+	cfg, err := load(t, "boards:\n  overrides:\n    tech:\n      anon_name: Nameless Hacker\n")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.Boards.For("general").AnonName != "Anonymous" || cfg.Boards.For("tech").AnonName != "Nameless Hacker" {
+		t.Fatalf("got %q and %q", cfg.Boards.For("general").AnonName, cfg.Boards.For("tech").AnonName)
+	}
+}
+
+func TestMode(t *testing.T) {
+	cfg, err := load(t, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.Mode != ModeCafe || cfg.Textboard() {
+		t.Fatalf("default mode is cafe, got %q", cfg.Mode)
+	}
+	if cfg, err = load(t, "mode: textboard\n"); err != nil || !cfg.Textboard() {
+		t.Fatalf("textboard mode: %+v %v", cfg.Mode, err)
 	}
 }
 

@@ -2,6 +2,10 @@
 
 A 2channel/futaba-style forum: **boards** hold **threads**, threads hold numbered **posts**.
 
+Posting needs an account in the default `cafe` mode. In [textboard mode](textboard-mode.md)
+anyone can post, posts show the board's default name (`anon_name`) or a name with a classic
+tripcode ([tripcodes.md](tripcodes.md)), and staff can sign theirs with a capcode.
+
 Seeded boards:
 
 | Board | Description |
@@ -76,6 +80,7 @@ All three limits are per board, set in [`config.yaml`](../configuration.md).
 | `bump_limit` | 300 posts | Replies past this no longer bump the thread. It's tagged `bump limit` and slowly sinks |
 | `post_limit` | 1000 posts | The thread is **full**: tagged `full`, and the reply box is replaced by *"this thread has reached N posts. start a new one on /board/."* |
 | `max_threads` | 150 | Creating a thread beyond this archives the least-recently-bumped live threads |
+| `anon_name` | Anonymous | The name shown on posts made without an account or tripcode in [textboard mode](textboard-mode.md); `preview_replies` (5) sits in the same block |
 
 Moderators can also **lock** a thread (no replies, tagged `locked`) and **pin** it (sorted first).
 Posting is rate-limited by the `cooldowns` settings ([moderation.md](moderation.md#cooldowns)).

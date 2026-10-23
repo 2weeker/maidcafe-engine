@@ -65,12 +65,16 @@ templ sidebarPanels(users []models.UserCard, tags []models.Tag) {
 templ searchBar(p Page) {
 	<form method="get" action="/search" class="search" role="search">
 		<label for="site-search" class="search-label">search://</label>
-		<input id="site-search" class="search-input" type="search" name="q" value={ p.Query } placeholder="notes, threads, ~users, #tags" autocomplete="off"/>
-		<select name="in" class="search-scope" aria-label="search scope">
-			for _, s := range SearchScopes(p.User != nil) {
-				<option value={ s } selected?={ s == p.Scope }>{ scopeLabel(s) }</option>
-			}
-		</select>
+		if Site.Textboard {
+			<input id="site-search" class="search-input" type="search" name="q" value={ p.Query } placeholder="threads and posts" autocomplete="off"/>
+		} else {
+			<input id="site-search" class="search-input" type="search" name="q" value={ p.Query } placeholder="notes, threads, ~users, #tags" autocomplete="off"/>
+			<select name="in" class="search-scope" aria-label="search scope">
+				for _, s := range SearchScopes(p.User != nil) {
+					<option value={ s } selected?={ s == p.Scope }>{ scopeLabel(s) }</option>
+				}
+			</select>
+		}
 		<button type="submit" class="search-go">go &gt;&gt;</button>
 	</form>
 }

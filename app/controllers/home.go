@@ -8,6 +8,13 @@ import (
 )
 
 func (ctl *Controller) Home(c fiber.Ctx) error {
+	if ctl.Config.Textboard() {
+		boards, err := ctl.Store.Boards(c.Context())
+		if err != nil {
+			return err
+		}
+		return render(c, fiber.StatusOK, templates.BoardsPage(ctl.page(c, "Home"), boards))
+	}
 	return ctl.renderHome(c, fiber.StatusOK, ctl.page(c, "Home"), "", nil)
 }
 

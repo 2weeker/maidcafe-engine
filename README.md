@@ -23,4 +23,8 @@ make logs      # follow the app log
 make down      # stop (data is kept)
 ```
 
+Two modes, picked by `mode:` in `config.yaml`: `cafe` (the default: notes, profiles, following,
+tags and boards, with open registration) or `textboard` (anonymous boards only, accounts for
+staff; see [docs/features/textboard-mode.md](docs/features/textboard-mode.md)).
+
 

@@ -19,19 +19,26 @@ templ BoardPage(p Page, v BoardIndex) {
 			</p>
 		</section>
 		@jumpDown()
-		if p.User != nil {
+		if p.User != nil || Site.Textboard {
 			<details class="box new-thread" open?={ p.Error != "" }>
 				<summary>[ start a new thread ]</summary>
 				<form method="post" action={ templ.URL(boardURL(v.Board.Slug)) } class="compose">
 					@csrfField(p)
+					@honeypot(v.Guard)
+					@postingAs(v.Identity)
 					<label for="thread-title">title</label>
 					<input id="thread-title" type="text" name="title" maxlength="120" required value={ v.Draft.Title }/>
 					<label for="thread-body">body</label>
 					<textarea id="thread-body" name="body" rows="8" maxlength="4000" required>{ v.Draft.Body }</textarea>
 					@formatHint()
+					@captchaField(v.Guard)
 					<div class="row-between">
-						@tagPicker(v.Picker)
-						<button type="submit">create thread</button>
+						if Site.Textboard {
+							@staffCheck(p, v.Draft.Staff)
+						} else {
+							@tagPicker(v.Picker)
+						}
+						<button type="submit" disabled?={ v.Guard.Locked != "" }>create thread</button>
 					</div>
 				</form>
 			</details>
@@ -72,7 +79,7 @@ templ threadPreview(p Page, tp models.ThreadPreview, v BoardIndex) {
 			@tagChips(tp.Tags)
 		</h2>
 		for i, post := range tp.Shown {
-			@postItem(p, tp.Thread, post, nil, v.PostsPerPage)
+			@postItem(p, tp.Thread, post, nil, v.PostsPerPage, v.Rules.AnonName)
 			if i == 0 && tp.Omitted > 0 {
 				<p class="omitted">
 					{ plural(tp.Omitted, "reply") } omitted.
@@ -99,11 +106,11 @@ templ threadStatus(t models.Thread, r config.BoardRules) {
 	}
 }
 
-templ postItem(p Page, t models.Thread, post models.Post, backlinks []int, perPage int) {
+templ postItem(p Page, t models.Thread, post models.Post, backlinks []int, perPage int, anon string) {
 	<article class={ "box", "post", templ.KV("gone", post.DeletedAt != nil) } id={ postAnchor(post.No) }>
 		<header class="meta">
 			<a href={ templ.URL(threadPostURL(t.ID, post.No, perPage)) } class="post-no">#{ itoa(post.No) }</a>
-			<a href={ templ.URL(userURL(post.Author)) } class="author">~{ post.Author }</a>
+			@authorLink(post.Author, post.AuthorRole, post.Name, post.Trip, anon)
 			if post.No == 1 {
 				<span class="tag">OP</span>
 			}
@@ -146,7 +153,7 @@ templ ThreadPage(p Page, v ThreadView) {
 		@jumpDown()
 		@pagerNav(v.Pager, threadURL(v.Thread.ID), "prev", "next")
 		for _, post := range v.Posts {
-			@postItem(p, *v.Thread, post, v.Backlinks[post.No], v.PostsPerPage)
+			@postItem(p, *v.Thread, post, v.Backlinks[post.No], v.PostsPerPage, v.Rules.AnonName)
 		}
 		@pagerNav(v.Pager, threadURL(v.Thread.ID), "prev", "next")
 		@sectionHead("reply")
@@ -165,18 +172,28 @@ templ ThreadPage(p Page, v ThreadView) {
 						<textarea id="unsent" rows="6" readonly>{ v.Draft }</textarea>
 					</div>
 				}
-			} else if p.User != nil {
+			} else if p.User != nil || Site.Textboard {
 				<form method="post" action={ templ.URL(threadURL(v.Thread.ID)) } class="box compose">
 					@csrfField(p)
-					<label for="reply-body">reply as ~{ p.User.Username }</label>
+					@honeypot(v.Guard)
+					@postingAs(v.Identity)
+					if Site.Textboard {
+						<label for="reply-body">reply</label>
+					} else {
+						<label for="reply-body">reply as ~{ p.User.Username }</label>
+					}
 					<textarea id="reply-body" name="body" rows="6" maxlength="4000" required>{ v.Draft }</textarea>
 					@formatHint()
+					@captchaField(v.Guard)
 					<div class="row-between">
-						<label class="check">
-							<input type="checkbox" name="sage" value="1" checked?={ v.Sage }/>
-							sage <span class="muted">(don't bump)</span>
-						</label>
-						<button type="submit">post reply</button>
+						<span class="checks">
+							<label class="check">
+								<input type="checkbox" name="sage" value="1" checked?={ v.Sage }/>
+								sage <span class="muted">(don't bump)</span>
+							</label>
+							@staffCheck(p, v.Staff)
+						</span>
+						<button type="submit" disabled?={ v.Guard.Locked != "" }>post reply</button>
 					</div>
 				</form>
 			} else {
@@ -203,7 +220,7 @@ templ ArchivePage(p Page, v ArchiveView) {
 					for _, t := range v.Threads {
 						<tr>
 							<td><a href={ templ.URL(threadURL(t.ID)) } class="thread-title">{ t.Title }</a></td>
-							<td><a href={ templ.URL(userURL(t.Author)) }>~{ t.Author }</a></td>
+							<td>@authorLink(t.Author, "", t.Name, t.Trip, "Anonymous")</td>
 							<td class="num">{ itoa(t.Posts()) }</td>
 							<td><time>{ stamp(*t.ArchivedAt) }</time></td>
 						</tr>
@@ -228,7 +245,7 @@ templ postTools(p Page, t models.Thread, post models.Post) {
 				}
 			</a>
 		</span>
-	} else if p.User.IsMod() && post.DeletedAt != nil && post.AuthorID != 0 {
+	} else if p.User.IsMod() && post.DeletedAt != nil && (post.Removed || post.AuthorID != 0) {
 		<form method="post" action={ templ.URL(fmt.Sprintf("/t/%d/p/%d/restore", t.ID, post.No)) } class="inline tools">
 			@csrfField(p)
 			<button type="submit" class="link tool">[restore]</button>

@@ -21,7 +21,10 @@ lifted), and any account holding `admin` that isn't listed is demoted to `user`.
 don't exist yet become admin the next time the app starts after they register. Admins can't be
 banned or demoted from the panel; edit the file and `make restart`.
 
-Mods are appointed by admins from `/admin/users`.
+Mods are appointed by admins from `/admin/users`. Admins can also **create accounts** there
+(`[ new account ]`: username, password, role `user` or `mod`), which is how moderators get
+accounts in [textboard mode](textboard-mode.md), where nobody can register. The first account of
+all is made from the shell: `make adduser NAME=alice`.
 
 ## Where moderation happens
 
@@ -36,7 +39,7 @@ Mods are appointed by admins from `/admin/users`.
 | Page | Who | What |
 | --- | --- | --- |
 | dashboard | mods | Counts (users, mods, banned, pending deletion, notes, threads, posts, tags) and the ten latest mod actions |
-| users | mods | Search by username; see role, activity, ban and deletion status; ban with a reason / unban. Admins also see a role toggle (`user` ↔ `mod`) |
+| users | mods | Search by username; see role, activity, ban and deletion status; ban with a reason / unban. Admins also see a role toggle (`user` ↔ `mod`) and a form to create an account |
 | boards | admins | Edit each board's name, description and position inline; delete empty boards; create new ones |
 | log | mods | Every moderation action, newest first, paginated |
 | config | admins | The configuration the running app loaded, as YAML, with the database password hidden |
@@ -56,6 +59,7 @@ Every form is a plain POST; no JavaScript anywhere.
 | **Ban** | The user can still log in and read, but every posting route (notes, replies, threads, tags, likes, reposts, follows) is refused with 403 and the reason. A banner tells them. Mods can ban users; only admins can ban mods; nobody can ban admins or themselves |
 | **Role** | Admins switch a user between `user` and `mod` |
 | **Boards** | Create (slug `a-z0-9`, 1-16 chars; name; description; position), edit, or delete a board with no threads |
+| **Create account** | Admins make a `user` or `mod` account with a password they pass on out of band; logged |
 
 ## The mod log
 
@@ -83,9 +87,9 @@ cooldowns:
 
 | Key | Limits |
 | --- | --- |
-| `post_seconds` | Time between a user's board posts (replies and new threads) |
+| `post_seconds` | Time between a user's board posts (replies and new threads); per address for anonymous posters in textboard mode |
 | `note_seconds` | Time between a user's notes and note replies |
-| `threads_per_day` | Threads a user can start in any rolling 24 hours |
+| `threads_per_day` | Threads a user can start in any rolling 24 hours; per address in textboard mode |
 
 Exceeding one returns `429` with a message like *slow down: you can post again in 12 seconds*.
 `0` disables that limit. Mods and admins are subject to the same limits.

@@ -7,11 +7,18 @@ import (
 	"io/fs"
 	"log"
 	"os"
+	"unicode/utf8"
 
 	"go.yaml.in/yaml/v3"
 )
 
+const (
+	ModeCafe      = "cafe"
+	ModeTextboard = "textboard"
+)
+
 type Config struct {
+	Mode         string       `yaml:"mode"`
 	Server       Server       `yaml:"server"`
 	Database     Database     `yaml:"database"`
 	Pagination   Pagination   `yaml:"pagination"`
@@ -117,17 +124,19 @@ type Pagination struct {
 }
 
 type BoardRules struct {
-	BumpLimit      int `yaml:"bump_limit"`
-	PostLimit      int `yaml:"post_limit"`
-	MaxThreads     int `yaml:"max_threads"`
-	PreviewReplies int `yaml:"preview_replies"`
+	BumpLimit      int    `yaml:"bump_limit"`
+	PostLimit      int    `yaml:"post_limit"`
+	MaxThreads     int    `yaml:"max_threads"`
+	PreviewReplies int    `yaml:"preview_replies"`
+	AnonName       string `yaml:"anon_name"`
 }
 
 type RulesOverride struct {
-	BumpLimit      *int `yaml:"bump_limit"`
-	PostLimit      *int `yaml:"post_limit"`
-	MaxThreads     *int `yaml:"max_threads"`
-	PreviewReplies *int `yaml:"preview_replies"`
+	BumpLimit      *int    `yaml:"bump_limit"`
+	PostLimit      *int    `yaml:"post_limit"`
+	MaxThreads     *int    `yaml:"max_threads"`
+	PreviewReplies *int    `yaml:"preview_replies"`
+	AnonName       *string `yaml:"anon_name"`
 }
 
 type Boards struct {
@@ -150,11 +159,17 @@ func (b Boards) For(slug string) BoardRules {
 	set(&r.PostLimit, o.PostLimit)
 	set(&r.MaxThreads, o.MaxThreads)
 	set(&r.PreviewReplies, o.PreviewReplies)
+	if o.AnonName != nil {
+		r.AnonName = *o.AnonName
+	}
 	return r
 }
 
+func (c Config) Textboard() bool { return c.Mode == ModeTextboard }
+
 func Defaults() Config {
 	return Config{
+		Mode:       ModeCafe,
 		Server:     Server{ListenAddr: ":8080"},
 		Database:   Database{URL: "postgres://maidcafe:maidcafe@localhost:5432/maidcafe?sslmode=disable"},
 		Pagination: Pagination{Notes: 30, Replies: 50, Threads: 10, Posts: 50, Archive: 50, Users: 30, Tags: 60, Search: 20},
@@ -183,6 +198,7 @@ func Defaults() Config {
 			PostLimit:      1000,
 			MaxThreads:     150,
 			PreviewReplies: 5,
+			AnonName:       "Anonymous",
 		}},
 	}
 }
@@ -231,6 +247,9 @@ func parse(r io.Reader, base Config) (Config, error) {
 }
 
 func (c Config) validate() error {
+	if c.Mode != ModeCafe && c.Mode != ModeTextboard {
+		return fmt.Errorf("config: mode must be %q or %q", ModeCafe, ModeTextboard)
+	}
 	p := c.Pagination
 	for name, v := range map[string]int{
 		"pagination.notes": p.Notes, "pagination.replies": p.Replies, "pagination.threads": p.Threads,
@@ -312,6 +331,8 @@ func (r BoardRules) validate(where string) error {
 		return fmt.Errorf("config: %s.max_threads must be at least 1", where)
 	case r.PreviewReplies < 0:
 		return fmt.Errorf("config: %s.preview_replies can't be negative", where)
+	case r.AnonName == "" || utf8.RuneCountInString(r.AnonName) > 30:
+		return fmt.Errorf("config: %s.anon_name must be 1-30 characters", where)
 	}
 	return nil
 }

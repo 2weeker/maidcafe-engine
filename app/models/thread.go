@@ -23,6 +23,8 @@ type Thread struct {
 	BoardSlug  string
 	Title      string
 	Author     string
+	Name       string
+	Trip       string
 	ReplyCount int
 	CreatedAt  time.Time
 	BumpedAt   time.Time
@@ -35,17 +37,20 @@ type Thread struct {
 func (t Thread) Posts() int { return t.ReplyCount + 1 }
 
 type Post struct {
-	ID        int64
-	ThreadID  int64
-	No        int
-	Author    string
-	Body      string
-	Sage      bool
-	CreatedAt time.Time
-	EditedAt  *time.Time
-	DeletedAt *time.Time
-	Removed   bool
-	AuthorID  int64
+	ID         int64
+	ThreadID   int64
+	No         int
+	Author     string
+	Body       string
+	Sage       bool
+	CreatedAt  time.Time
+	EditedAt   *time.Time
+	DeletedAt  *time.Time
+	Removed    bool
+	AuthorID   int64
+	AuthorRole string
+	Name       string
+	Trip       string
 }
 
 type ThreadPreview struct {
@@ -60,13 +65,13 @@ func cleanText(s string, max int) (string, bool) {
 	return s, n >= 1 && n <= max
 }
 
-const threadCols = `t.id, t.board_id, b.slug, t.title, coalesce(u.username, 'deleted'), t.reply_count, t.created_at, t.bumped_at, t.archived_at, t.locked_at, t.pinned,
+const threadCols = `t.id, t.board_id, b.slug, t.title, coalesce(u.username, ''), coalesce(op.name, ''), coalesce(op.trip, ''), t.reply_count, t.created_at, t.bumped_at, t.archived_at, t.locked_at, t.pinned,
 	coalesce((SELECT array_agg(g.name ORDER BY g.name) FROM thread_tags tt JOIN tags g ON g.id = tt.tag_id WHERE tt.thread_id = t.id), '{}'::text[])
-	FROM threads t LEFT JOIN users u ON u.id = t.user_id JOIN boards b ON b.id = t.board_id`
+	FROM threads t LEFT JOIN users u ON u.id = t.user_id JOIN boards b ON b.id = t.board_id LEFT JOIN posts op ON op.thread_id = t.id AND op.no = 1`
 
 func scanThread(r pgx.Row) (Thread, error) {
 	var t Thread
-	err := r.Scan(&t.ID, &t.BoardID, &t.BoardSlug, &t.Title, &t.Author, &t.ReplyCount, &t.CreatedAt, &t.BumpedAt, &t.ArchivedAt, &t.LockedAt, &t.Pinned, &t.Tags)
+	err := r.Scan(&t.ID, &t.BoardID, &t.BoardSlug, &t.Title, &t.Author, &t.Name, &t.Trip, &t.ReplyCount, &t.CreatedAt, &t.BumpedAt, &t.ArchivedAt, &t.LockedAt, &t.Pinned, &t.Tags)
 	return t, err
 }
 
@@ -98,7 +103,7 @@ func (s *Store) ThreadByID(ctx context.Context, id int64) (*Thread, error) {
 	return &t, nil
 }
 
-func (s *Store) CreateThread(ctx context.Context, boardID, userID int64, title, body string, maxThreads int, tagIDs []int64) (int64, error) {
+func (s *Store) CreateThread(ctx context.Context, boardID, userID int64, id Identity, title, body string, maxThreads int, tagIDs []int64) (int64, error) {
 	title, ok := cleanText(title, 120)
 	if !ok {
 		return 0, ErrBadTitle
@@ -108,18 +113,19 @@ func (s *Store) CreateThread(ctx context.Context, boardID, userID int64, title, 
 		return 0, ErrBadBody
 	}
 
-	var id int64
+	var threadID int64
 	err := pgx.BeginFunc(ctx, s.DB, func(tx pgx.Tx) error {
 		if err := tx.QueryRow(ctx,
-			`INSERT INTO threads (board_id, user_id, title) VALUES ($1, $2, $3) RETURNING id`,
-			boardID, userID, title).Scan(&id); err != nil {
+			`INSERT INTO threads (board_id, user_id, title) VALUES ($1, nullif($2::bigint, 0), $3) RETURNING id`,
+			boardID, userID, title).Scan(&threadID); err != nil {
 			return err
 		}
 		if _, err := tx.Exec(ctx,
-			`INSERT INTO posts (thread_id, user_id, body, no) VALUES ($1, $2, $3, 1)`, id, userID, body); err != nil {
+			`INSERT INTO posts (thread_id, user_id, body, no, name, trip) VALUES ($1, nullif($2::bigint, 0), $3, 1, $4, $5)`,
+			threadID, userID, body, id.Name, id.Trip); err != nil {
 			return err
 		}
-		if err := attachTags(ctx, tx, "thread_tags", "thread_id", id, tagIDs); err != nil {
+		if err := attachTags(ctx, tx, "thread_tags", "thread_id", threadID, tagIDs); err != nil {
 			return err
 		}
 		_, err := tx.Exec(ctx, `UPDATE threads SET archived_at = now() WHERE id IN (
@@ -127,7 +133,7 @@ func (s *Store) CreateThread(ctx context.Context, boardID, userID int64, title, 
 			ORDER BY bumped_at DESC, id DESC OFFSET $2)`, boardID, maxThreads)
 		return err
 	})
-	return id, err
+	return threadID, err
 }
 
 type ReplyOptions struct {
@@ -135,6 +141,7 @@ type ReplyOptions struct {
 	BumpLimit int
 	PostLimit int
 	Refs      []int
+	Identity  Identity
 }
 
 func (s *Store) CreateReply(ctx context.Context, threadID, userID int64, body string, opt ReplyOptions) (int, error) {
@@ -158,8 +165,8 @@ func (s *Store) CreateReply(ctx context.Context, threadID, userID int64, body st
 			return err
 		}
 		if _, err := tx.Exec(ctx,
-			`INSERT INTO posts (thread_id, user_id, body, no, sage) VALUES ($1, $2, $3, $4, $5)`,
-			threadID, userID, body, no, opt.Sage); err != nil {
+			`INSERT INTO posts (thread_id, user_id, body, no, sage, name, trip) VALUES ($1, nullif($2::bigint, 0), $3, $4, $5, $6, $7)`,
+			threadID, userID, body, no, opt.Sage, opt.Identity.Name, opt.Identity.Trip); err != nil {
 			return err
 		}
 		for _, to := range opt.Refs {
@@ -193,10 +200,10 @@ func (s *Store) whyNoReply(ctx context.Context, tx pgx.Tx, threadID int64) error
 	return ErrThreadFull
 }
 
-const postCols = `p.id, p.thread_id, p.no, coalesce(u.username, 'deleted'),
-	CASE WHEN p.user_id IS NULL THEN '[deleted]' WHEN p.deleted_at IS NOT NULL AND p.removed THEN '[removed by moderator]'
+const postCols = `p.id, p.thread_id, p.no, coalesce(u.username, ''),
+	CASE WHEN p.deleted_at IS NOT NULL AND p.removed THEN '[removed by moderator]'
 	     WHEN p.deleted_at IS NOT NULL THEN '[deleted]' ELSE p.body END,
-	p.sage, p.created_at, p.edited_at, p.deleted_at, p.removed, coalesce(p.user_id, 0)
+	p.sage, p.created_at, p.edited_at, p.deleted_at, p.removed, coalesce(p.user_id, 0), coalesce(u.role, ''), p.name, p.trip
 	FROM posts p LEFT JOIN users u ON u.id = p.user_id`
 
 func (s *Store) queryPosts(ctx context.Context, sql string, args ...any) ([]Post, error) {
@@ -206,7 +213,7 @@ func (s *Store) queryPosts(ctx context.Context, sql string, args ...any) ([]Post
 	}
 	return pgx.CollectRows(rows, func(r pgx.CollectableRow) (Post, error) {
 		var p Post
-		err := r.Scan(&p.ID, &p.ThreadID, &p.No, &p.Author, &p.Body, &p.Sage, &p.CreatedAt, &p.EditedAt, &p.DeletedAt, &p.Removed, &p.AuthorID)
+		err := r.Scan(&p.ID, &p.ThreadID, &p.No, &p.Author, &p.Body, &p.Sage, &p.CreatedAt, &p.EditedAt, &p.DeletedAt, &p.Removed, &p.AuthorID, &p.AuthorRole, &p.Name, &p.Trip)
 		return p, err
 	})
 }

@@ -9,7 +9,8 @@ lives in `config.yaml` ([configuration.md](../configuration.md)).
 | | Guests | Logged-in users |
 | --- | --- | --- |
 | `/login` and `/register` | the forms, with a captcha when `captcha.enabled` | not reachable: both redirect to your profile, so an account can't be used to skip the captcha and mint more accounts |
-| Honeypot field | yes, when `captcha.honeypot` | n/a |
+| Thread and reply forms (textboard mode, where guests can post) | a captcha when `captcha.enabled`, with its own lockout counter | no captcha; cooldowns and the per-account request limit apply |
+| Honeypot field | yes, when `captcha.honeypot`: auth forms, thread and reply forms | yes, on the thread and reply forms |
 | Request rate limit | `rate_limits.guests`, per address | `rate_limits.users`, per account |
 | Login / register attempt limit | `rate_limits.auth_attempts`, per address | same |
 | New accounts per address | `rate_limits.registrations` | n/a |

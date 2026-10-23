@@ -135,21 +135,28 @@ templ Settings(p Page, draft models.User, preview bool) {
 			@sectionHead("preview :: not saved yet")
 			@profileHeader(p, draft, models.UserCard{ID: draft.ID, Username: draft.Username}, false, true)
 		}
-		@sectionHead("edit profile")
-		<form method="post" action="/settings" class="box compose settings">
-			@csrfField(p)
-			<label for="bio">bio <span class="muted">(max { itoa(models.MaxBio) } chars, markdown)</span></label>
-			<textarea id="bio" name="bio" rows="4" maxlength={ itoa(models.MaxBio) }>{ draft.Bio }</textarea>
-			@formatHint()
-			<label for="art">text art <span class="muted">(max { itoa(models.MaxArtLines) } lines &times; { itoa(models.MaxArtCols) } columns, shown exactly as typed)</span></label>
-			<textarea id="art" name="art" class="art-input" rows="12" wrap="off" spellcheck="false">{ draft.Art }</textarea>
-			<p class="hint">ascii, box drawing ┌─┐, blocks ▓▒░, braille ⣿ all work. leading spaces are kept.</p>
-			<p class="hint ruler" aria-hidden="true">{ artRuler }</p>
-			<div class="row-end gap">
-				<button type="submit" name="action" value="preview" class="secondary">preview</button>
-				<button type="submit" name="action" value="save">save</button>
-			</div>
-		</form>
+		if Site.Textboard {
+			@sectionHead("account")
+			<p class="box muted">logged in as <b>~{ draft.Username }</b> ({ draft.Role }). posts are anonymous unless you tick <i>sign as</i> on the form.</p>
+		} else {
+			@sectionHead("edit profile")
+		}
+		if !Site.Textboard {
+			<form method="post" action="/settings" class="box compose settings">
+				@csrfField(p)
+				<label for="bio">bio <span class="muted">(max { itoa(models.MaxBio) } chars, markdown)</span></label>
+				<textarea id="bio" name="bio" rows="4" maxlength={ itoa(models.MaxBio) }>{ draft.Bio }</textarea>
+				@formatHint()
+				<label for="art">text art <span class="muted">(max { itoa(models.MaxArtLines) } lines &times; { itoa(models.MaxArtCols) } columns, shown exactly as typed)</span></label>
+				<textarea id="art" name="art" class="art-input" rows="12" wrap="off" spellcheck="false">{ draft.Art }</textarea>
+				<p class="hint">ascii, box drawing ┌─┐, blocks ▓▒░, braille ⣿ all work. leading spaces are kept.</p>
+				<p class="hint ruler" aria-hidden="true">{ artRuler }</p>
+				<div class="row-end gap">
+					<button type="submit" name="action" value="preview" class="secondary">preview</button>
+					<button type="submit" name="action" value="save">save</button>
+				</div>
+			</form>
+		}
 		@sectionHead("delete account")
 		if draft.DeleteAt != nil {
 			<section class="box danger">
@@ -163,10 +170,14 @@ templ Settings(p Page, draft models.User, preview bool) {
 		} else {
 			<form method="post" action="/settings/delete" class="box compose danger">
 				@csrfField(p)
-				<p>
-					this removes your account, your notes and replies, your likes, reposts and follows.
-					your board posts stay in their threads as <b>~deleted</b> with the text <b>[deleted]</b>, so other people's threads keep working.
-				</p>
+				if Site.Textboard {
+					<p>this removes your account. your signed board posts stay in their threads with the text <b>[deleted]</b>, so threads keep working.</p>
+				} else {
+					<p>
+						this removes your account, your notes and replies, your likes, reposts and follows.
+						your board posts stay in their threads as <b>~deleted</b> with the text <b>[deleted]</b>, so other people's threads keep working.
+					</p>
+				}
 				<p>nothing happens right away: you get <b>{ plural(p.GraceHours, "hour") }</b> to cancel from this page or the banner on every page. after that it's gone for good and the username is free again.</p>
 				<label for="delete-password">type your password to confirm</label>
 				<input id="delete-password" type="password" name="password" autocomplete="current-password" required/>
